@@ -1,0 +1,119 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  plan:
+    name: Select validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      checkout_sha: ${{ steps.select.outputs.checkout_sha }}
+      changed_count: ${{ steps.select.outputs.changed_count }}
+      docs_validated: ${{ steps.select.outputs.docs_validated }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test routing and documentation validation
+        run: |
+          python3 -m unittest discover -s scripts -p test_ci_validation.py
+          python3 -m unittest discover -s scripts -p test_docs_validation.py
+      - name: Select from complete Git evidence
+        id: select
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          WORKFLOW_INPUTS_CONTEXT: '{}'
+        run: python3 scripts/ci_validation.py select
+      - name: Check repository documentation
+        run: python3 scripts/docs_validation.py
+  security:
+    name: Repository security
+    uses: ./.github/workflows/security.yml
+  python:
+    name: Python checks
+    needs: plan
+    if: needs.plan.outputs.mode == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.12.3'
+          enable-cache: true
+      - name: Install locked CPU checks
+        run: UV_PROJECT_ENVIRONMENT=.venv-check uv sync --locked --extra cpu --extra dev
+      - name: Lint and test
+        run: |
+          .venv-check/bin/ruff check .
+          .venv-check/bin/python -m pytest -q
+          .venv-check/bin/python -m unittest discover -s scripts -p 'test_*.py'
+  frontend:
+    name: Frontend checks
+    needs: plan
+    if: needs.plan.outputs.mode == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+  browser:
+    name: Browser acceptance
+    needs: plan
+    if: needs.plan.outputs.mode == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
+        with:
+          version: '0.12.3'
+          enable-cache: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: UV_PROJECT_ENVIRONMENT=.venv-check uv sync --locked --extra cpu --extra dev
+      - run: .venv-check/bin/python -m playwright install --with-deps chromium
+      - run: npm ci
+      - run: npm run build
+      - run: make test-browser
+  required:
+    name: Required validation
+    if: always()
+    needs: [plan, security, python, frontend, browser]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Require all selected checks to succeed
+        env:
+          VALIDATION_NEEDS: ${{ toJSON(needs) }}
+          WORKFLOW_INPUTS_CONTEXT: '{}'
+        run: python3 scripts/ci_validation.py gate

@@ -1,6 +1,6 @@
 # Repository and development infrastructure plan
 
-Status: proposed. This document and the accompanying agent-policy draft are planning deliverables. Repository creation, Git initialization, infrastructure implementation, and character-model installation have not been performed by this planning task.
+Status: implemented under issue #1; final integration is tracked in its PR. The user authorized execution and selected a public repository. The sections below retain the original plan; effective settings and acceptance are recorded in [bootstrap validation](bootstrap-validation.md). Character-model installation remains future work.
 
 ## Objective
 
@@ -22,7 +22,7 @@ Scope includes repository setup, agent instructions, developer commands, automat
 
 ## 1. Repository identity and ownership
 
-Tentative default: **`andrepaim/idol-playground`**, private, default branch `main`. Repository name and visibility remain user-selectable; a broader name may be preferable as character generation expands beyond Idol.
+Selected repository: **`andrepaim/idol-playground`**, public, default branch `main`. Repository name and visibility remain user-selectable; a broader name may be preferable as character generation expands beyond Idol.
 
 Keep the existing local directory during bootstrap. A GitHub name change does not require moving the running workspace or rewriting machine-local paths immediately.
 
@@ -35,7 +35,7 @@ Before creation:
 
 Create an empty repository with Issues enabled. Keep the wiki and Pages disabled unless a later requirement needs them. Prefer the GitHub connector where it supports an operation; use the authenticated `gh` CLI for repository/settings/project operations the connector does not expose.
 
-The repository is private by the tentative default. A code license remains a user choice; do not assume MIT solely because some model dependencies use it. Record third-party notices separately from the app's eventual source-code license.
+The repository is public by explicit user instruction. A code license remains a user choice; do not assume MIT solely because some model dependencies use it. Record third-party notices separately from the app's eventual source-code license.
 
 ## 2. Carry over DistillPod's engineering rules
 
@@ -271,4 +271,4 @@ The release guide describes how an explicitly requested source/package release w
 
 Bootstrap is complete when a fresh clone can build and test the current solution, the existing local inference flow still works, policy and CI are active, generated/private files stay out of history, and remaining limitations are explicit.
 
-The Game Character implementation starts after this foundation is complete and its implementation is authorized. This planning task does not itself start that feature or an issue-processing loop.
+The Game Character implementation starts after this foundation is complete and its implementation is authorized. Bootstrap execution does not itself start the character feature or its issue-processing loop.

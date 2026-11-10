@@ -1,4 +1,3 @@
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -67,7 +66,7 @@ def test_bad_timing_cache_does_not_block_generation(tmp_path, corrupt):
 
 @pytest.mark.parametrize("cfg,optimize,passes", [(3, False, 2), (3, True, 1), (0, False, 1)])
 def test_real_module_hooks_count_complete_sampling_steps_and_restore_pipeline(tmp_path, cfg, optimize, passes):
-    torch = pytest.importorskip("torch")
+    import torch
     clock, events = Clock(), []
     progress = tracker(tmp_path, clock, events, cfg_strength=cfg)
 
