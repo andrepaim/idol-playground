@@ -1,6 +1,6 @@
 # Splat-derived mesh fidelity experiment
 
-Status: authorized experiment following the owner's rejection of distorted TripoSR reconstruction. The saved Idol splat is the geometry/appearance reference; do not reconstruct the original image with another generative model.
+Status: experiment completed on the saved dog splat; see [measured results and limitations](splat-mesh-results.md). This follows the owner's rejection of distorted TripoSR reconstruction. The saved Idol splat is the geometry/appearance reference; do not reconstruct the original image with another generative model.
 
 ## Plan and acceptance
 
