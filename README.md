@@ -2,6 +2,14 @@
 
 A small web app for [Speridlabs Idol](https://huggingface.co/speridlabs/idol): upload an image, generate a 3D Gaussian splat, orbit it in your browser, and download the standard `.ply` file.
 
+## See it in action
+
+Paçoca, reconstructed from a single photograph and rotated in the local app.
+
+[![Paçoca’s photograph alongside a rotating 3D Gaussian splat in Idol Playground](docs/demos/pacoca-turntable.gif)](docs/demos/pacoca-turntable.mp4?raw=1)
+
+[Download the MP4](docs/demos/pacoca-turntable.mp4?raw=1) · [Demo details](docs/demos/README.md)
+
 ## Run locally
 
 Requires Python 3.11–3.13, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ (or 22.12+), and an NVIDIA CUDA GPU. The model card reports approximately 7.2 GB peak VRAM at default settings. This machine's RTX 3060 has 12 GB; other GPU applications also consume VRAM.
