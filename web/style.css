@@ -9,3 +9,12 @@
 #conversion-actions{padding:12px 24px;border-top:1px solid var(--line);font-size:11px;line-height:1.7;color:var(--muted)}#conversion-actions p{margin:7px 0 0}#convert-mesh{background:#26321d;border:1px solid #657e46;color:var(--lime);padding:9px 14px;border-radius:6px;cursor:pointer;font:inherit}#convert-mesh:disabled{opacity:.5;cursor:default}#mesh-warnings{padding:12px 24px;border-top:1px solid var(--line);margin:0}
 
 .saved-results{max-width:480px;margin-bottom:24px}
+
+#walk-actions, #walk-exports { padding: 18px 24px; border-top: 1px solid var(--line, #ddd); }
+#paw-review, #walk-playback, #walk-exports { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+#walk-playback { padding: 12px 20px; background: #f3f5ed; }
+#paw-review label { display: flex; gap: 6px; align-items: center; }
+#walk-actions p { font-size: 13px; }
+#walk-time { width: 150px; }
+#walk-exports a { font-size: 13px; }
+[hidden] { display: none !important; }
