@@ -28,6 +28,9 @@ from rig_setup import models_ready as rig_models_ready
 from splat_mesh_runtime import backend_installed as splat_backend_installed, idol_installed as splat_idol_installed, generate_splat_mesh, stage_config
 from splat_mesh_setup import models_ready as splat_models_ready
 
+from walk_runtime import backend_installed as walk_backend_installed, generate_walk, PHASES as WALK_PHASES
+from walk_motion import PROFILE as WALK_PROFILE, profile_from_glb, validate_roles
+
 ROOT = Path(__file__).resolve().parent
 OUTPUTS = ROOT / "outputs"
 OUTPUTS.mkdir(exist_ok=True)
@@ -55,6 +58,7 @@ mesh_cancellations = {}
 def status():
     installed = find_spec("idol") is not None
     return {
+        "walk": {"ready": walk_backend_installed()},
         "splat_mesh": {"ready": splat_backend_installed(), "weights_downloaded": splat_models_ready(),
                        "upload_ready": splat_idol_installed() and models_ready()},
         "rig": {"ready": rig_backend_installed(), "weights_downloaded": rig_models_ready()},
@@ -74,6 +78,16 @@ def update(job_id: str, **values):
         jobs[job_id].update(values)
 
 
+def gpu():
+    """The torch device module for the best accelerator: CUDA, else Apple Silicon MPS."""
+    import torch
+    if torch.cuda.is_available():
+        return "cuda", torch.cuda
+    if torch.backends.mps.is_available():
+        return "mps", torch.mps
+    return None, None
+
+
 def generate(job_id: str, image_path: Path, settings: dict):
     global pipeline, active_job
     started = time.monotonic()
@@ -85,21 +99,21 @@ def generate(job_id: str, image_path: Path, settings: dict):
         )
         with lock:
             job_progress[job_id] = progress
-        import torch
         from idol import IdolPipeline
 
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is unavailable. Install a CUDA-enabled PyTorch build and check nvidia-smi.")
+        device, accel = gpu()
+        if device is None:
+            raise RuntimeError("No GPU available. Use an NVIDIA CUDA GPU or an Apple Silicon Mac (MPS).")
         if pipeline is None:
             if not models_ready():
                 progress.start("download", "Downloading model files. ETA will be available once the download finishes…")
             weights, encoders = ensure_models()
             progress.start("load")
             pipeline = IdolPipeline.from_pretrained(
-                weights, device="cuda", image_encoders=encoders,
+                weights, device=device, image_encoders=encoders,
                 optimize=os.environ.get("IDOL_OPTIMIZE", "0") == "1",
             )
-        with instrument_pipeline(pipeline, progress, torch.cuda.synchronize):
+        with instrument_pipeline(pipeline, progress, accel.synchronize):
             output = pipeline(str(image_path), **settings)
         progress.start("save")
         output.gaussian.save_ply(str(folder / "object.ply"))
@@ -126,8 +140,9 @@ def generate(job_id: str, image_path: Path, settings: dict):
         update(job_id, state="error", stage="error", eta_seconds=None, message=message[:1500])
     finally:
         try:
-            import torch
-            torch.cuda.empty_cache()
+            _, accel = gpu()
+            if accel is not None:
+                accel.empty_cache()
         except Exception:
             logging.debug("GPU cleanup unavailable", exc_info=True)
         finally:
@@ -248,6 +263,77 @@ def generate_splat_mesh_job(job_id: str, source: Path | None, settings: dict, im
             active_job = None
             job_progress.pop(job_id,None)
             mesh_cancellations.pop(job_id,None)
+
+
+def generate_walk_job(job_id, source, settings):
+    global active_job
+    folder=OUTPUTS/job_id
+    started=time.monotonic()
+    try:
+        release_idol()
+        progress=MeshProgress({},lambda **v:update(job_id,**v),OUTPUTS/'.walk-timings.json',
+                              stages=WALK_PHASES,baseline=dict(zip(WALK_PHASES,(25,8,35,20,20))),scales={})
+        with lock:job_progress[job_id]=progress
+        details=generate_walk(source,folder,settings,progress.event,mesh_cancellations[job_id])
+        files={name:f'/outputs/{job_id}/{name}' for name in
+               ('animated.glb','walk-inplace.glb','walk-forward.glb','animated.fbx','character.blend','walk.json')
+               if (folder/name).is_file()}
+        update(job_id,state='complete',stage='complete',eta_seconds=0,message='Your experimental canine walk is ready.',
+               walk=details,files=files,seconds=round(time.monotonic()-started,1),**progress.finish())
+    except MeshCancelled:
+        update(job_id,state='cancelled',stage='cancelled',eta_seconds=None,message='Walking cancelled. The source rig is preserved.')
+    except Exception as error:
+        logging.exception('Walking failed')
+        update(job_id,state='error',stage='error',eta_seconds=None,message=str(error)[:1500])
+    finally:
+        try:(folder/'job.json').write_text(json.dumps(jobs[job_id],indent=2))
+        except OSError:logging.warning('Could not save walking metadata',exc_info=True)
+        with lock:
+            active_job=None
+            job_progress.pop(job_id,None)
+            mesh_cancellations.pop(job_id,None)
+
+
+def walk_source(source_id):
+    if len(source_id)!=32 or any(c not in '0123456789abcdef' for c in source_id):
+        raise HTTPException(404,'Rig generation not found.')
+    job=get_job(source_id);folder=OUTPUTS/source_id
+    if job.get('state')!='complete' or job.get('output_type')!='rig' or not all(
+        (folder/name).is_file() for name in ('rigged.glb','skin.fbx')):
+        raise HTTPException(409,'Walking needs a completed rig with its retained source skin FBX.')
+    return folder
+
+
+@app.get('/api/jobs/{source_id}/walk-profile')
+def walk_profile(source_id: str):
+    folder=walk_source(source_id)
+    return profile_from_glb((folder/'rigged.glb').read_bytes())
+
+
+@app.post('/api/jobs/{source_id}/walk',status_code=202)
+def create_walk(source_id: str, profile: Literal['canine-34-v1']=Form('canine-34-v1'),
+                speed: Literal['relaxed','normal']=Form('relaxed'),motion: Literal['inplace','forward']=Form('inplace'),
+                paws: str=Form(...),reviewed: bool=Form(False)):
+    global active_job
+    folder=walk_source(source_id)
+    if not walk_backend_installed():raise HTTPException(503,'Walking needs the Blender environment. Run make setup-rig.')
+    if profile!=WALK_PROFILE or not profile_from_glb((folder/'rigged.glb').read_bytes())['supported']:
+        raise HTTPException(422,'Unsupported skeleton for the reviewed canine profile.')
+    try:roles=validate_roles(json.loads(paws),reviewed)
+    except (ValueError,TypeError) as error:raise HTTPException(422,str(error)) from None
+    settings={'profile':profile,'speed':speed,'motion':motion,'paws':roles,'reviewed':reviewed}
+    job_id=uuid4().hex
+    with lock:
+        if active_job:raise HTTPException(409,'A generation is already running. Wait for it to finish.')
+        (OUTPUTS/job_id).mkdir()
+        jobs[job_id]={'id':job_id,'state':'running','stage':'starting','eta_seconds':None,'started_at':time.time(),
+                      'message':'Starting canine walking…','output_type':'walk','source_job':source_id,'settings':settings}
+        mesh_cancellations[job_id]=threading.Event();active_job=job_id
+        try:executor.submit(generate_walk_job,job_id,folder,settings)
+        except Exception:
+            active_job=None;mesh_cancellations.pop(job_id,None);jobs.pop(job_id,None)
+            raise
+    return {'id':job_id}
 
 
 def require_splat_setup(*,upload=False):
@@ -413,7 +499,7 @@ def recent_jobs(limit: int = Query(50,ge=1,le=50)):
     for key,job in snapshots.items():
         if not isinstance(job,dict) or job.get('state')!='complete':continue
         kind = job.get('output_type','splat')
-        filename = 'rigged.glb' if kind=='rig' else 'object.glb' if kind=='mesh' else 'object.ply'
+        filename = 'animated.glb' if kind=='walk' else 'rigged.glb' if kind=='rig' else 'object.glb' if kind=='mesh' else 'object.ply'
         if not (OUTPUTS/key/filename).is_file():continue
         started = job.get('started_at',0)
         if not isinstance(started,(int,float)):started = 0
@@ -449,7 +535,7 @@ def cancel_mesh(job_id: str):
             raise HTTPException(409, 'This generation is no longer running.')
         event = mesh_cancellations.get(job_id)
         if event is None:
-            raise HTTPException(409, 'Cancellation is available for mesh and rigging jobs only.')
+            raise HTTPException(409, 'Cancellation is available for mesh, rigging and walking jobs only.')
         event.set()
         jobs[job_id]['message'] = 'Stopping the generation worker…'
     return {'id': job_id, 'state': 'cancelling'}

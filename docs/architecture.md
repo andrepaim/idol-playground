@@ -26,3 +26,5 @@ The server has no authentication and binds to `127.0.0.1`. It is intended for pe
 Splat-derived meshes, legacy TripoSR, cancellation, mesh preview, skeleton prediction, skinning and GLB/FBX/Blender export are implemented. Normal splat generation still uses its existing in-process cache. Game topology, engine acceptance and authored animation remain [Game Character work](game-character-plan.md).
 
 Optional automatic rigging uses a third pinned environment and sequential bounded UniRig/Blender phase processes. Both skeleton and skin models run locally with offline assets; exports retain source UVs/textures or vertex colors and are reimported for binding/appearance checks. A separate rig job preserves its completed static source job and shares GPU ownership, cancellation and persisted status with mesh generation.
+
+Turntable recording on a walking result holds the current animation pose and locks preview controls during capture. Afterwards it restores the prior playback state, keeping forward root travel and camera follow from moving the orbit target while recording.

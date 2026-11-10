@@ -9,7 +9,8 @@ const meshStages = [['preprocess','Prepare'], ['load','Load'], ['reconstruct','G
 const rigStages = [['rig_prepare','Prepare'],['skeleton','Bones'],['rig_bind','Bind'],['skinning','Weights'],['rig_export','Export'],['rig_verify','Check'],['preview','Preview']];
 const conversionStages = [['capture','Views'],['stereo','Depth'],['surface','Surface'],['export','Save'],['preview','Preview']];
 const idolMeshStages = [...splatStages.filter(([stage]) => stage !== 'preview'),...conversionStages];
-let lastMeshJob, lastSplatJob;
+let lastMeshJob, lastSplatJob, lastRigJob, walkProfile;
+const walkStages = [['walk_prepare','Weights'],['walk_pose','Stance'],['walk_bake','Contact'],['walk_export','Export'],['walk_verify','Check'],['preview','Preview']];
 let stages = splatStages.map(([stage]) => stage);
 
 function isMesh() { return $('output_type').value === 'mesh'; }
@@ -30,8 +31,8 @@ function syncOutputControls() {
   $('mesh-note').textContent = isIdolMesh() ? 'Mesh from the Idol result, with embedded vertex colors. Main-subject mode can omit detached parts. Inspect before rigging.' : 'Independent image reconstruction. Inspect the mesh before animation.';
 }
 
-function configureStages(rig = false, conversion = false) {
-  const definitions = rig ? rigStages : conversion ? conversionStages : isIdolMesh() ? idolMeshStages : (isMesh() ? meshStages : splatStages);
+function configureStages(rig = false, conversion = false, walk = false) {
+  const definitions = walk ? walkStages : rig ? rigStages : conversion ? conversionStages : isIdolMesh() ? idolMeshStages : (isMesh() ? meshStages : splatStages);
   stages = definitions.map(([stage]) => stage);
   $('stage-list').replaceChildren(...definitions.map(([stage, label]) => {
     const item = document.createElement('span');
@@ -75,10 +76,10 @@ function showProgress(job) {
     if (index === itemIndex) item.setAttribute('aria-current', 'step');
     else item.removeAttribute('aria-current');
   });
-  if (['sampling', 'extract', 'texture', 'capture', 'stereo'].includes(job.stage) && job.step != null && job.total_steps > 0) {
+  if (['sampling', 'extract', 'texture', 'capture', 'stereo', 'walk_bake'].includes(job.stage) && job.step != null && job.total_steps > 0) {
     $('generation-bar').max = job.total_steps;
     $('generation-bar').value = job.step;
-    $('step-detail').textContent = job.stage === 'capture' ? `Rendered image ${job.step} of ${job.total_steps}` : job.stage === 'stereo' ? `Depth pair ${job.step} of ${job.total_steps}` : job.stage === 'sampling' ? `Sampling step ${job.step} of ${job.total_steps}` : `${job.stage === 'texture' ? 'Texture' : 'Surface'} samples · ${Math.round(job.step / job.total_steps * 100)}%`;
+    $('step-detail').textContent = job.stage === 'walk_bake' ? `Contact frame ${job.step} of ${job.total_steps}` : job.stage === 'capture' ? `Rendered image ${job.step} of ${job.total_steps}` : job.stage === 'stereo' ? `Depth pair ${job.step} of ${job.total_steps}` : job.stage === 'sampling' ? `Sampling step ${job.step} of ${job.total_steps}` : `${job.stage === 'texture' ? 'Texture' : 'Surface'} samples · ${Math.round(job.step / job.total_steps * 100)}%`;
   } else {
     $('generation-bar').removeAttribute('value');
     $('step-detail').textContent = job.stage === 'preview' ? 'Preparing the interactive viewer…' : '';
@@ -99,6 +100,7 @@ async function request(url, options) {
 }
 
 function updateButton() {
+  updateWalkControls();
   $('saved-result').disabled = busy;
   $('video-download').disabled = busy;
   $('generate').disabled = busy || !serverReady || !$('image').files.length;
@@ -148,6 +150,7 @@ async function disposeViewer() {
   meshViewer = undefined;
   $('mesh-toolbar').hidden = true;
   $('video-download').hidden = true;
+  $('walk-playback').hidden = true;
   resizeObserver?.disconnect();
   try {
     if (viewer) await viewer.dispose();
@@ -204,6 +207,10 @@ async function watchJob(id) {
       return;
     }
     if (job.state === 'complete') {
+      if (job.output_type === 'walk') { await showWalk(job); refreshSavedResults(); return; }
+      lastRigJob = undefined;
+      $('walk-actions').hidden = true;
+      $('walk-exports').hidden = true;
       const rig = job.output_type === 'rig';
       const mesh = rig || job.output_type === 'mesh' || Boolean(job.files['object.glb']);
       const file = rig ? job.files['rigged.glb'] : (mesh ? job.files['object.glb'] : job.files['object.ply']);
@@ -247,6 +254,8 @@ async function watchJob(id) {
         $('fbx-download').href = job.files['rigged.fbx'];
         $('blend-download').href = job.files['character.blend'];
         $('static-download').href = `/outputs/${job.source_job}/object.glb`;
+        lastRigJob = id;
+        await loadWalkProfile();
       }
       updateRigControls();
       updateConversionControls();
@@ -268,6 +277,9 @@ $('form').addEventListener('submit', async (event) => {
   $('mesh-warnings').hidden = true;
   $('rig-actions').hidden = true;
   $('rig-exports').hidden = true;
+  lastRigJob = undefined;
+  $('walk-actions').hidden = true;
+  $('walk-exports').hidden = true;
   updateButton();
   const formData = new FormData($('form'));
   $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
@@ -346,8 +358,15 @@ $('video-download').addEventListener('click', async () => {
     camera: viewer.camera, controls: viewer.controls, render: () => viewer.forceRenderNextFrame(),
   };
   if (busy || !canvas || !orbit) return;
+  const resumeWalk = !$('walk-playback').hidden && meshViewer?.state().playing;
+  if (resumeWalk) meshViewer.play(false);
+  const previewControls = [...document.querySelectorAll('#mesh-toolbar input, #mesh-toolbar button, #walk-playback input, #walk-playback button, #walk-playback select')]
+    .map((input) => ({ input, disabled: input.disabled }));
+  for (const {input} of previewControls) input.disabled = true;
   busy = true;
   updateButton();
+  updateRigControls();
+  updateConversionControls();
   $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
   $('message').hidden = true;
   const button = $('video-download');
@@ -365,9 +384,13 @@ $('video-download').addEventListener('click', async () => {
   } finally {
     button.textContent = 'Download video ↓';
     busy = false;
+    for (const {input,disabled} of previewControls) input.disabled = disabled;
+    if (resumeWalk) meshViewer.play(true);
     $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = false; });
     syncOutputControls();
     updateButton();
+    updateRigControls();
+    updateConversionControls();
   }
 });
 $('output_type').addEventListener('change', () => { syncOutputControls(); applyStatus(); });
@@ -487,7 +510,7 @@ async function refreshSavedResults() {
     const options = (data.jobs || []).map((job) => {
       const option = document.createElement('option');
       option.value = job.id;
-      const kind = job.output_type === 'rig' ? 'Rig' : job.output_type === 'mesh' ? 'Mesh' : 'Splat';
+      const kind = job.output_type === 'walk' ? 'Walk' : job.output_type === 'rig' ? 'Rig' : job.output_type === 'mesh' ? 'Mesh' : 'Splat';
       option.textContent = `${kind} · ${job.started_at ? new Date(job.started_at * 1000).toLocaleString() : job.id.slice(0,8)}`;
       return option;
     });
@@ -512,7 +535,7 @@ $('saved-result').addEventListener('change',async () => {
     if (job.state !== 'complete') throw new Error('This saved result is not complete.');
     $('output_type').value = job.output_type === 'splat' || !job.output_type ? 'splat' : 'mesh';
     if (job.output_type === 'mesh') $('mesh_backend').value = job.mesh_backend || 'triposr';
-    configureStages(job.output_type === 'rig');
+    configureStages(job.output_type === 'rig', false, job.output_type === 'walk');
     await disposeViewer();
     await watchJob(id);
   } catch (error) { showError(error.message); }
@@ -527,3 +550,108 @@ $('saved-result').addEventListener('change',async () => {
   }
 });
 refreshSavedResults();
+
+function updateWalkControls() {
+  const available = Boolean(walkProfile?.supported && cachedStatus?.walk?.ready);
+  $('create-walk').disabled = busy || !available || !$('walk-reviewed').checked;
+  $('paw-review').hidden = !available;
+  if (walkProfile && lastRigJob) $('walk-note').textContent = cachedStatus?.walk?.ready ? walkProfile.reason : 'Walking needs the Blender environment. Run make setup-rig.';
+  $('walk-actions').querySelectorAll('select,input').forEach((input) => { input.disabled = busy; });
+}
+async function loadWalkProfile() {
+  $('walk-reviewed').checked = false;
+  walkProfile = undefined;
+  $('walk-actions').hidden = !lastRigJob;
+  if (!lastRigJob) return;
+  try {
+    walkProfile = await request(`/api/jobs/${lastRigJob}/walk-profile`);
+    $('walk-note').textContent = cachedStatus?.walk?.ready ? walkProfile.reason : 'Walking needs the Blender environment. Run make setup-rig.';
+    if (walkProfile.supported) {
+      for (const [role,name] of Object.entries(walkProfile.paws)) $(`paw-${role}`).value = name;
+    }
+  } catch (error) { $('walk-note').textContent = error.message; }
+  updateWalkControls();
+}
+async function showWalk(job) {
+  lastRigJob = job.source_job;
+  lastMeshJob = undefined;
+  lastSplatJob = undefined;
+  $('rig-actions').hidden = true;
+  $('conversion-actions').hidden = true;
+  $('rig-exports').hidden = true;
+  $('source-download').hidden = true;
+  $('result-badge').textContent = 'EXPERIMENTAL CANINE WALK';
+  $('result-info').textContent = `${job.walk.bones} bones · ${job.walk.duration}s cycle · ${job.settings.speed}`;
+  $('mesh-warnings').textContent = (job.walk.warnings || []).join(' ');
+  $('mesh-warnings').hidden = false;
+  $('download').href = job.files['animated.glb'];
+  $('download').textContent = 'Download animated .glb ↓';
+  $('download').download = 'idol-walk.glb';
+  $('download').hidden = false;
+  for (const [id,name] of Object.entries({'walk-inplace':'walk-inplace.glb','walk-forward':'walk-forward.glb','walk-fbx':'animated.fbx','walk-blend':'character.blend','walk-report':'walk.json'})) $(id).href = job.files[name];
+  $('walk-source').href = `/outputs/${job.source_job}/rigged.glb`;
+  $('walk-exports').hidden = false;
+  showProgress({stage:'preview',message:'Opening the walking preview…'});
+  try {
+    await disposeViewer();
+    const {loadMeshViewer} = await import('./mesh-viewer.js');
+    meshViewer = await loadMeshViewer($('viewer'),job.files['animated.glb'],{
+      walking:true, stride:job.settings.motion === 'forward' ? job.walk.stride : 0,
+      ground:job.walk.ground_z,
+      onTime(time,duration) { $('walk-time').max = duration; $('walk-time').value = time; },
+    });
+    $('mesh-toolbar').hidden = false;
+    $('skeleton-control').hidden = false;
+    $('bend-control').hidden = true;
+    $('skeleton').checked = $('wireframe').checked = false;
+    $('walk-playback').hidden = false;
+    $('video-download').hidden = !videoFormat();
+    $('walk-play').textContent = 'Pause';
+    $('walk-floor').checked = $('walk-follow').checked = true;
+    $('walk-play-speed').value = '1';
+    $('empty').hidden = true;
+  } catch (error) { $('empty').hidden = false; showError(`Walk saved, but preview failed. ${error.message}`); }
+  await loadWalkProfile();
+  for (const [role,name] of Object.entries(job.settings.paws || {})) $(`paw-${role}`).value = name;
+}
+$('walk-reviewed').addEventListener('change',updateWalkControls);
+for (const role of ['fore_left','fore_right','hind_left','hind_right']) {
+  const select = $(`paw-${role}`);
+  select.addEventListener('focus',() => meshViewer?.highlight(select.value));
+  select.addEventListener('change',() => { meshViewer?.highlight(select.value); $('walk-reviewed').checked = false; updateWalkControls(); });
+}
+$('walk-play').addEventListener('click',() => {
+  const playing = $('walk-play').textContent === 'Pause';
+  meshViewer?.play(!playing); $('walk-play').textContent = playing ? 'Play' : 'Pause';
+});
+$('walk-restart').addEventListener('click',() => { meshViewer?.restart(); $('walk-play').textContent = 'Pause'; });
+$('walk-rest').addEventListener('click',() => { meshViewer?.rest(); $('walk-play').textContent = 'Play'; });
+$('walk-time').addEventListener('input',() => { meshViewer?.seek(Number($('walk-time').value)); $('walk-play').textContent = 'Play'; });
+$('walk-play-speed').addEventListener('change',() => meshViewer?.speed(Number($('walk-play-speed').value)));
+$('walk-floor').addEventListener('change',() => meshViewer?.floor($('walk-floor').checked));
+$('walk-follow').addEventListener('change',() => meshViewer?.follow($('walk-follow').checked));
+$('create-walk').addEventListener('click',async () => {
+  if (busy || !lastRigJob || !walkProfile?.supported || !$('walk-reviewed').checked) return;
+  const source = lastRigJob;
+  const paws = Object.fromEntries(['fore_left','fore_right','hind_left','hind_right'].map((r) => [r,$(`paw-${r}`).value]));
+  const body = new URLSearchParams({profile:walkProfile.profile,paws:JSON.stringify(paws),reviewed:'true',speed:$('walk-speed').value,motion:$('walk-motion').value});
+  busy = true; updateButton(); updateWalkControls(); updateRigControls(); updateConversionControls();
+  configureStages(false,false,true);
+  $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
+  $('cancel').hidden = false; $('cancel').disabled = true;
+  $('message').hidden = true; $('busy').hidden = false;
+  generationStartedAt = Date.now();
+  showProgress({stage:'starting',message:'Starting canine walking…'});
+  const tick = setInterval(updateTiming,1000);
+  try {
+    const job = await request(`/api/jobs/${source}/walk`,{method:'POST',body});
+    activeJobId = job.id; $('cancel').disabled = false;
+    await disposeViewer(); await watchJob(job.id);
+  } catch (error) { showError(error.message); $('result-info').textContent = 'Walking could not finish. The source rig is preserved.'; }
+  finally {
+    clearInterval(tick); busy = false; activeJobId = undefined;
+    $('busy').hidden = true; $('cancel').hidden = true;
+    $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = false; });
+    syncOutputControls(); updateButton(); updateWalkControls(); updateRigControls(); updateConversionControls();
+  }
+});
