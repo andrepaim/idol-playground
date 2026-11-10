@@ -21,8 +21,8 @@ def site():
             super().__init__(*args, directory=str(root), **kwargs)
 
         def do_GET(self):
-            if self.path in ('/fixture.ply', '/fixture.glb', '/rig-fixture.glb'):
-                data = rig_bytes() if self.path == '/rig-fixture.glb' else mesh_bytes() if self.path.endswith('.glb') else splat_bytes()
+            if self.path in ('/fixture.ply', '/fixture.glb', '/rig-fixture.glb', '/colored-fixture.glb'):
+                data = colored_bytes() if self.path == '/colored-fixture.glb' else rig_bytes() if self.path == '/rig-fixture.glb' else mesh_bytes() if self.path.endswith('.glb') else splat_bytes()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/octet-stream')
                 self.send_header('Content-Length', str(len(data)))
@@ -83,14 +83,21 @@ def browser_page(site):
         page = browser.new_page()
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
-        state = {'phase': 'sampling', 'ready': True, 'mesh_ready': True, 'rig_ready': True, 'submissions': 0, 'output_type': 'splat'}
+        state = {'phase': 'sampling', 'ready': True, 'mesh_ready': True, 'stereo_ready': True, 'mesh_backend': 'idol', 'conversions': 0, 'saved': [], 'rig_ready': True, 'submissions': 0, 'output_type': 'splat'}
 
         def api(route):
             path = route.request.url.split('/api/')[1]
             if path == 'status':
-                route.fulfill(json={'ready': state['ready'], 'weights_downloaded': True, 'mesh': {'ready': state['mesh_ready'], 'weights_downloaded': True}, 'rig': {'ready': state['rig_ready'], 'weights_downloaded': True}})
+                route.fulfill(json={'ready': state['ready'], 'weights_downloaded': True, 'mesh': {'ready': state['mesh_ready'], 'weights_downloaded': True}, 'rig': {'ready': state['rig_ready'], 'weights_downloaded': True}, 'splat_mesh': {'ready': state['stereo_ready'], 'weights_downloaded': True, 'upload_ready': state['ready']}})
+            elif path == 'jobs':
+                route.fulfill(json={'jobs':state['saved']})
+            elif path.endswith('/mesh'):
+                state.update(output_type='mesh',mesh_backend='idol',phase='capture')
+                state['conversions']+=1
+                route.fulfill(status=202,json={'id':'converted'})
             elif path == 'generate':
                 state['output_type'] = 'mesh' if b'name="output_type"\r\n\r\nmesh' in route.request.post_data_buffer else 'splat'
+                state['mesh_backend'] = 'idol' if b'name="mesh_backend"\r\n\r\nidol' in route.request.post_data_buffer else 'triposr'
                 state['submissions'] += 1
                 route.fulfill(status=202, json={'id': 'fixture'})
             elif path.endswith('/rig'):
@@ -113,7 +120,9 @@ def browser_page(site):
                     job.update(state='complete', seconds=20, settings={'num_gaussians': 128, 'seed': 42},
                                files={'object.ply': '/fixture.ply'})
                     if state['output_type'] == 'mesh':
-                        job.update(output_type='mesh', mesh={'triangles': 1, 'texture_resolution': 512}, files={'object.glb': '/fixture.glb'})
+                        job.update(output_type='mesh', mesh_backend=state['mesh_backend'], mesh={'triangles': 1, 'texture_resolution': 512}, files={'object.glb': '/fixture.glb'})
+                        if state['mesh_backend']=='idol':
+                            job.update(mesh={'triangles':1,'appearance':'vertex_colors','warnings':['Dense mesh; inspect surface holes before rigging.']},files={'object.glb':'/colored-fixture.glb','source.ply':'/fixture.ply'})
                 if phase == 'complete' and state['output_type'] == 'rig':
                     job.update(output_type='rig',source_job='fixture',rig={'bones':2,'triangles':1},files={'rigged.glb':'/rig-fixture.glb','rigged.fbx':'/rigged.fbx','character.blend':'/character.blend'})
                 route.fulfill(json=job)
@@ -183,6 +192,7 @@ def test_missing_model_setup_and_invalid_upload(browser_page):
 def test_mesh_controls_download_and_switch_back_to_splat(browser_page):
     page, state = browser_page
     page.locator('#output_type').select_option('mesh')
+    page.locator('#mesh_backend').select_option('triposr')
     upload(page)
     expect(page.locator('#mode')).to_be_disabled()
     expect(page.locator('#target_faces')).to_be_enabled()
@@ -210,6 +220,7 @@ def test_mesh_controls_download_and_switch_back_to_splat(browser_page):
 def test_mesh_cancel_and_missing_backend(browser_page):
     page, state = browser_page
     page.locator('#output_type').select_option('mesh')
+    page.locator('#mesh_backend').select_option('triposr')
     upload(page)
     state['phase'] = 'extract'
     page.locator('#generate').click()
@@ -222,6 +233,7 @@ def test_mesh_cancel_and_missing_backend(browser_page):
     state['mesh_ready'] = False
     page.reload()
     page.locator('#output_type').select_option('mesh')
+    page.locator('#mesh_backend').select_option('triposr')
     upload(page)
     expect(page.locator('#setup')).to_contain_text('make setup-mesh mesh-models')
     expect(page.locator('#generate')).to_be_disabled()
@@ -282,3 +294,66 @@ def test_experimental_rig_controls_progress_animation_and_exports(browser_page):
     expect(page.locator('#rig-exports')).to_be_hidden()
     expect(page.locator('#rig-actions')).to_be_hidden()
     expect(page.locator('#viewer canvas')).to_have_count(1)
+
+
+def colored_bytes():
+    data=mesh_bytes();length=struct.unpack_from('<I',data,12)[0]
+    doc=json.loads(data[20:20+length]);blob=bytearray(data[28+length:])
+    while len(blob)%4:blob.append(0)
+    begin=len(blob);blob.extend(struct.pack('<12f',*([.3,.15,.05,1]*3)))
+    view=len(doc['bufferViews']);doc['bufferViews'].append({'buffer':0,'byteOffset':begin,'byteLength':48})
+    accessor=len(doc['accessors']);doc['accessors'].append({'bufferView':view,'componentType':5126,'type':'VEC4','count':3})
+    attrs=doc['meshes'][0]['primitives'][0]['attributes'];attrs.pop('TEXCOORD_0');attrs['COLOR_0']=accessor
+    doc.pop('images');doc.pop('textures')
+    doc['materials']=[{'doubleSided':True,'extensions':{'KHR_materials_unlit':{}},'pbrMetallicRoughness':{}}]
+    doc['extensionsUsed']=['KHR_materials_unlit'];doc['buffers'][0]['byteLength']=len(blob)
+    encoded=json.dumps(doc).encode();encoded+=b' '*(-len(encoded)%4)
+    chunks=struct.pack('<I4s',len(encoded),b'JSON')+encoded+struct.pack('<I4s',len(blob),b'BIN\0')+blob
+    return struct.pack('<4sII',b'glTF',2,len(chunks)+12)+chunks
+
+
+def test_default_mesh_uses_idol_and_reports_real_view_and_depth_counts(browser_page):
+    page,state=browser_page
+    page.locator('#output_type').select_option('mesh')
+    expect(page.locator('#mesh_backend')).to_have_value('idol')
+    expect(page.locator('#mode')).to_be_enabled()
+    expect(page.locator('#target_faces')).to_be_disabled()
+    expect(page.locator('#surface_quality')).to_be_enabled()
+    upload(page);state['phase']='capture';page.locator('#generate').click()
+    expect(page.locator('#step-detail')).to_contain_text('Rendered image')
+    expect(page.locator('#saved-result')).to_be_disabled()
+    state['phase']='stereo'
+    expect(page.locator('#step-detail')).to_contain_text('Depth pair')
+    state['phase']='complete'
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#result-badge')).to_have_text('SPLAT-DERIVED MESH')
+    expect(page.locator('#result-info')).to_contain_text('vertex colors')
+    expect(page.locator('#mesh-warnings')).to_contain_text('surface holes')
+    expect(page.locator('#source-download')).to_be_visible()
+    expect(page.locator('#viewer canvas')).to_have_count(1)
+
+
+def test_saved_splat_converts_without_new_image_or_regeneration(browser_page):
+    page,state=browser_page
+    state['saved']=[{'id':'fixture','output_type':'splat','started_at':1}]
+    state['phase']='complete';page.reload()
+    page.locator('#saved-result').select_option('fixture')
+    expect(page.locator('#convert-mesh')).to_be_enabled(timeout=20000)
+    assert state['submissions']==0
+    page.locator('#convert-mesh').click()
+    expect(page.locator('#step-detail')).to_contain_text('Rendered image')
+    expect(page.locator('#cancel')).to_be_enabled()
+    state['phase']='complete'
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#result-info')).to_contain_text('vertex colors')
+    assert state['conversions']==1 and state['submissions']==0
+
+
+def test_default_mesh_missing_setup_is_independent_from_legacy_mesh(browser_page):
+    page,state=browser_page
+    state['stereo_ready']=False;page.reload()
+    page.locator('#output_type').select_option('mesh');upload(page)
+    expect(page.locator('#generate')).to_be_disabled()
+    expect(page.locator('#setup')).to_contain_text('make setup-splat-mesh splat-mesh-models')
+    page.locator('#mesh_backend').select_option('triposr')
+    expect(page.locator('#generate')).to_be_enabled()

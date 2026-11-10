@@ -37,6 +37,7 @@ def validate_glb(data):
         accessors = document['accessors']
 
         def view(index):
+            if not isinstance(index,int) or not 0 <= index < len(views):raise ValueError('Invalid buffer view reference')
             item = views[index]
             begin, count = item.get('byteOffset', 0), item['byteLength']
             if item.get('buffer', 0) != 0 or begin < 0 or count <= 0 or begin + count > buffers[0]['byteLength']:
@@ -44,6 +45,7 @@ def validate_glb(data):
             return binary[begin:begin + count], item
 
         def accessor(index, types, component_types):
+            if not isinstance(index,int) or not 0 <= index < len(accessors):raise ValueError('Invalid accessor reference')
             item = accessors[index]
             if item.get('sparse') or item['type'] not in types or item['componentType'] not in component_types:
                 raise ValueError('Unsupported mesh accessor')
@@ -51,7 +53,7 @@ def validate_glb(data):
             if not isinstance(count, int) or count <= 0:
                 raise ValueError('Empty mesh accessor')
             raw, definition = view(item['bufferView'])
-            width = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3}[item['type']]
+            width = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4}[item['type']]
             code = {5121: 'B', 5123: 'H', 5125: 'I', 5126: 'f'}[item['componentType']]
             packed = struct.calcsize('<' + code * width)
             stride = definition.get('byteStride', packed)
@@ -59,11 +61,14 @@ def validate_glb(data):
             if stride < packed or begin < 0 or begin + (count - 1) * stride + packed > len(raw):
                 raise ValueError('Mesh accessor exceeds buffer bounds')
             values = [struct.unpack_from('<' + code * width, raw, begin + i * stride) for i in range(count)]
+            if item.get('normalized') and code != 'f':
+                scale = 255 if code == 'B' else 65535 if code == 'H' else 2**32-1
+                values = [tuple(value/scale for value in row) for row in values]
             return values
 
-        images = document['images']
-        textures = document['textures']
-        materials = document['materials']
+        images = document.get('images',[])
+        textures = document.get('textures',[])
+        materials = document.get('materials',[])
         for image in images:
             if image.get('uri') or 'bufferView' not in image:
                 raise ValueError('Textures must be embedded')
@@ -74,29 +79,43 @@ def validate_glb(data):
                 if decoded.width > 4096 or decoded.height > 4096:
                     raise ValueError('Texture exceeds supported size')
                 decoded.verify()
-        vertices, triangles = 0, 0
+        vertices, triangles, colored = 0, 0, 0
         for mesh in document['meshes']:
             for primitive in mesh['primitives']:
                 if primitive.get('mode', 4) != 4:
                     raise ValueError('Mesh must contain triangles')
                 positions = accessor(primitive['attributes']['POSITION'], {'VEC3'}, {5126})
-                uvs = accessor(primitive['attributes']['TEXCOORD_0'], {'VEC2'}, {5126})
+                uvs = accessor(primitive['attributes']['TEXCOORD_0'], {'VEC2'}, {5126}) if 'TEXCOORD_0' in primitive['attributes'] else []
                 indices = accessor(primitive['indices'], {'SCALAR'}, {5121, 5123, 5125})
-                if len(uvs) != len(positions) or len(indices) % 3:
+                if (uvs and len(uvs) != len(positions)) or len(indices) % 3:
                     raise ValueError('Invalid mesh UV/index counts')
                 if not all(math.isfinite(value) for row in positions + uvs for value in row):
                     raise ValueError('Non-finite mesh geometry')
                 if any(index[0] >= len(positions) for index in indices):
                     raise ValueError('Mesh index exceeds vertex count')
-                texture = materials[primitive['material']]['pbrMetallicRoughness']['baseColorTexture']['index']
-                source = textures[texture]['source']
-                if not 0 <= source < len(images):
-                    raise ValueError('Missing material texture')
+                attributes = primitive['attributes']
+                if 'COLOR_0' in attributes:
+                    definition = accessors[attributes['COLOR_0']]
+                    if definition['componentType'] != 5126 and not definition.get('normalized'):
+                        raise ValueError('Integer vertex colors must be normalized')
+                    colors = accessor(attributes['COLOR_0'], {'VEC3','VEC4'}, {5126,5121,5123})
+                    if len(colors) != len(positions) or not all(math.isfinite(value) and 0 <= value <= 1 for row in colors for value in row):
+                        raise ValueError('Invalid vertex color data')
+                    colored += len(positions)
+                else:
+                    if not uvs:raise ValueError('Mesh requires vertex colors or UV texture appearance')
+                    material = primitive['material']
+                    if not isinstance(material,int) or not 0 <= material < len(materials):raise ValueError('Invalid material')
+                    texture = materials[material]['pbrMetallicRoughness']['baseColorTexture']['index']
+                    if not isinstance(texture,int) or not 0 <= texture < len(textures):raise ValueError('Missing material texture')
+                    source = textures[texture]['source']
+                    if not 0 <= source < len(images):raise ValueError('Missing material texture')
                 vertices += len(positions)
                 triangles += len(indices) // 3
-        if not vertices or not triangles or not images:
+        if not vertices or not triangles or not (images or colored):
             raise ValueError('Empty textured mesh')
-        return {'vertices': vertices, 'triangles': triangles, 'textures': len(images)}
+        return {'vertices': vertices, 'triangles': triangles, 'textures': len(images),
+                'appearance': 'vertex_colors' if colored == vertices else 'texture'}
     except (KeyError, IndexError, TypeError, struct.error, json.JSONDecodeError, OSError) as error:
         raise ValueError('Invalid embedded textured mesh') from error
 
@@ -120,7 +139,7 @@ def backend_installed():
         return False
 
 
-def run_worker(command, folder, on_event, cancel, *, timeout=1200, env=None):
+def run_worker(command, folder, on_event, cancel, *, timeout=1200, env=None, grace=5):
     """Read structured progress without letting a silent process block cancellation."""
     import os
     import queue
@@ -179,7 +198,7 @@ def run_worker(command, folder, on_event, cancel, *, timeout=1200, env=None):
             if process.poll() is None:
                 os.killpg(process.pid, signal.SIGTERM)
                 try:
-                    process.wait(timeout=5)
+                    process.wait(timeout=grace)
                 except subprocess.TimeoutExpired:
                     os.killpg(process.pid, signal.SIGKILL)
                     process.wait(timeout=5)
