@@ -14,7 +14,7 @@ import time
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Query
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -25,6 +25,8 @@ from mesh_runtime import backend_installed as mesh_backend_installed, generate_m
 from mesh_progress import MeshProgress
 from rig_runtime import backend_installed as rig_backend_installed, generate_rig, PHASES as RIG_PHASES
 from rig_setup import models_ready as rig_models_ready
+from splat_mesh_runtime import backend_installed as splat_backend_installed, idol_installed as splat_idol_installed, generate_splat_mesh, stage_config
+from splat_mesh_setup import models_ready as splat_models_ready
 
 ROOT = Path(__file__).resolve().parent
 OUTPUTS = ROOT / "outputs"
@@ -53,6 +55,8 @@ mesh_cancellations = {}
 def status():
     installed = find_spec("idol") is not None
     return {
+        "splat_mesh": {"ready": splat_backend_installed(), "weights_downloaded": splat_models_ready(),
+                       "upload_ready": splat_idol_installed() and models_ready()},
         "rig": {"ready": rig_backend_installed(), "weights_downloaded": rig_models_ready()},
         "backend": "local",
         "model_installed": installed,
@@ -213,6 +217,80 @@ def generate_rig_job(job_id: str, source: Path, seed: int):
             mesh_cancellations.pop(job_id,None)
 
 
+def generate_splat_mesh_job(job_id: str, source: Path | None, settings: dict, image_path: Path | None = None):
+    global active_job
+    folder = OUTPUTS/job_id
+    started = time.monotonic()
+    try:
+        release_idol()
+        stages,baseline,scales = stage_config(settings,upload=image_path is not None)
+        progress = MeshProgress(settings,lambda **values:update(job_id,**values),OUTPUTS/'.splat-mesh-timings.json',
+                                stages=stages,baseline=baseline,scales=scales)
+        with lock:
+            job_progress[job_id] = progress
+        details = generate_splat_mesh(source,folder,settings,progress.event,mesh_cancellations[job_id],image_path=image_path)
+        files = {name:f'/outputs/{job_id}/{name}' for name in
+                 ('object.glb','source.ply','raw-mesh.ply','mesh.json','mesh-settings.json','prepared.png') if (folder/name).is_file()}
+        timing = progress.finish()
+        update(job_id,state='complete',stage='complete',eta_seconds=0,message='Your splat-derived mesh is ready.',
+               files=files,mesh=details,seconds=round(time.monotonic()-started,1),**timing)
+    except MeshCancelled:
+        update(job_id,state='cancelled',stage='cancelled',eta_seconds=None,message='Mesh generation cancelled. Original files are preserved.')
+    except Exception as error:
+        logging.exception('Splat-derived mesh generation failed')
+        update(job_id,state='error',stage='error',eta_seconds=None,message=str(error)[:1500])
+    finally:
+        try:
+            (folder/'job.json').write_text(json.dumps(jobs[job_id],indent=2))
+        except OSError:
+            logging.warning('Could not save splat mesh metadata',exc_info=True)
+        with lock:
+            active_job = None
+            job_progress.pop(job_id,None)
+            mesh_cancellations.pop(job_id,None)
+
+
+def require_splat_setup(*,upload=False):
+    if not splat_backend_installed() or not splat_models_ready():
+        raise HTTPException(503,'Splat-derived mesh setup is incomplete. Run make setup-splat-mesh splat-mesh-models.')
+    if upload and (not splat_idol_installed() or not models_ready()):
+        raise HTTPException(503,'Image-to-mesh also needs Idol. Run make setup-local models.')
+
+
+@app.post('/api/jobs/{source_id}/mesh', status_code=202)
+def convert_splat(source_id: str, surface_quality: Literal['fine','balanced'] = Form('fine'),
+                  component_mode: Literal['largest','all'] = Form('largest')):
+    global active_job
+    if len(source_id)!=32 or any(c not in '0123456789abcdef' for c in source_id):
+        raise HTTPException(404,'Splat generation not found.')
+    source_job = get_job(source_id)
+    source = OUTPUTS/source_id/'object.ply'
+    if source_job['state']!='complete' or source_job.get('output_type','splat')!='splat' or not source.is_file():
+        raise HTTPException(409,'Complete an Idol splat generation before creating a mesh.')
+    require_splat_setup()
+    settings = {'surface_quality':surface_quality,'component_mode':component_mode,
+                'seed':source_job.get('settings',{}).get('seed',42),
+                'num_gaussians':source_job.get('settings',{}).get('num_gaussians',262144)}
+    if settings['num_gaussians'] not in (65536,131072,262144,524288,1048576):
+        raise HTTPException(422,'Unsupported source Gaussian count.')
+    job_id = uuid4().hex
+    with lock:
+        if active_job:raise HTTPException(409,'A generation is already running. Wait for it to finish.')
+        (OUTPUTS/job_id).mkdir()
+        jobs[job_id] = {'id':job_id,'state':'running','stage':'starting','eta_seconds':None,'started_at':time.time(),
+                        'message':'Starting splat-to-mesh conversion…','output_type':'mesh','mesh_backend':'idol',
+                        'settings':settings,'source_job':source_id}
+        mesh_cancellations[job_id] = threading.Event()
+        active_job = job_id
+        try:executor.submit(generate_splat_mesh_job,job_id,source,settings)
+        except Exception:
+            active_job = None
+            mesh_cancellations.pop(job_id,None)
+            jobs.pop(job_id,None)
+            raise
+    return {'id':job_id}
+
+
 @app.post('/api/jobs/{source_id}/rig', status_code=202)
 def create_rig(source_id: str):
     global active_job
@@ -221,7 +299,7 @@ def create_rig(source_id: str):
     source_job = get_job(source_id)
     source = OUTPUTS/source_id/'object.glb'
     if source_job.get('output_type') != 'mesh' or source_job['state'] != 'complete' or not source.is_file():
-        raise HTTPException(409,'Complete a textured mesh generation before automatic rigging.')
+        raise HTTPException(409,'Complete a mesh generation before automatic rigging.')
     if not rig_backend_installed() or not rig_models_ready():
         raise HTTPException(503,'Rigging setup is incomplete. Run make setup-rig rig-models.')
     seed = source_job.get('settings',{}).get('seed',42)
@@ -252,6 +330,9 @@ async def create_job(
     image: UploadFile = File(...),
     mode: Literal["real", "synthetic"] = Form("real"),
     output_type: Literal["splat", "mesh"] = Form("splat"),
+    mesh_backend: Literal['triposr','idol'] = Form('triposr'),
+    surface_quality: Literal['fine','balanced'] = Form('fine'),
+    component_mode: Literal['largest','all'] = Form('largest'),
     mesh_resolution: int = Form(192),
     texture_resolution: int = Form(1024),
     target_faces: int = Form(25000),
@@ -264,7 +345,9 @@ async def create_job(
     global active_job
     if num_gaussians not in (65536, 131072, 262144, 524288, 1048576):
         raise HTTPException(422, "Choose a supported Gaussian count.")
-    if output_type == 'mesh':
+    if output_type == 'mesh' and mesh_backend == 'idol':
+        require_splat_setup(upload=True)
+    elif output_type == 'mesh':
         if mesh_resolution not in (128, 192, 256) or texture_resolution not in (512, 1024, 2048) or target_faces not in (10000, 25000, 50000, 100000):
             raise HTTPException(422, 'Choose supported mesh, triangle and texture settings.')
         if not status().get('mesh', {}).get('ready'):
@@ -287,7 +370,9 @@ async def create_job(
         raise HTTPException(422, "Upload a valid PNG, JPEG, or WebP image.") from None
     settings = dict(mode=mode, steps=steps, seed=seed, num_gaussians=num_gaussians,
                     cfg_strength=cfg_strength, rescale_t=rescale_t)
-    if output_type == 'mesh':
+    if output_type == 'mesh' and mesh_backend == 'idol':
+        settings.update(surface_quality=surface_quality,component_mode=component_mode)
+    elif output_type == 'mesh':
         settings = dict(mesh_resolution=mesh_resolution, texture_resolution=texture_resolution,
                         target_faces=target_faces, seed=seed)
     job_id = uuid4().hex
@@ -298,18 +383,43 @@ async def create_job(
         folder.mkdir()
         prepared.save(folder / "input.png")
         jobs[job_id] = {"id": job_id, "state": "running", "stage": "starting", "eta_seconds": None,
-                        "started_at": time.time(), "message": "Starting…", "settings": settings, "output_type": output_type}
+                        "started_at": time.time(), "message": "Starting…", "settings": settings, "output_type": output_type, "mesh_backend": mesh_backend if output_type == "mesh" else None}
         active_job = job_id
         try:
             if output_type == 'mesh':
                 mesh_cancellations[job_id] = threading.Event()
-            executor.submit(generate_mesh_job if output_type == 'mesh' else generate, job_id, folder / "input.png", settings)
+            if output_type == 'mesh' and mesh_backend == 'idol':
+                executor.submit(generate_splat_mesh_job,job_id,None,settings,folder/'input.png')
+            else:
+                executor.submit(generate_mesh_job if output_type == 'mesh' else generate, job_id, folder / "input.png", settings)
         except Exception:
             active_job = None
             jobs.pop(job_id, None)
             mesh_cancellations.pop(job_id, None)
             raise
     return {"id": job_id}
+
+
+@app.get('/api/jobs')
+def recent_jobs(limit: int = Query(50,ge=1,le=50)):
+    with lock:
+        snapshots = {key:dict(value) for key,value in jobs.items()}
+    for folder in OUTPUTS.iterdir():
+        if not folder.is_dir() or len(folder.name)!=32 or any(c not in '0123456789abcdef' for c in folder.name):continue
+        if folder.name in snapshots:continue
+        try:snapshots[folder.name] = json.loads((folder/'job.json').read_text())
+        except (OSError,ValueError):continue
+    summaries = []
+    for key,job in snapshots.items():
+        if not isinstance(job,dict) or job.get('state')!='complete':continue
+        kind = job.get('output_type','splat')
+        filename = 'rigged.glb' if kind=='rig' else 'object.glb' if kind=='mesh' else 'object.ply'
+        if not (OUTPUTS/key/filename).is_file():continue
+        started = job.get('started_at',0)
+        if not isinstance(started,(int,float)):started = 0
+        summaries.append({'id':key,'state':'complete','output_type':kind,'mesh_backend':job.get('mesh_backend'),
+                          'started_at':started,'seconds':job.get('seconds')})
+    return {'jobs':sorted(summaries,key=lambda job:job['started_at'],reverse=True)[:limit]}
 
 
 @app.get("/api/jobs/{job_id}")

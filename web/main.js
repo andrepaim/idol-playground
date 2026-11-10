@@ -6,20 +6,31 @@ let latestProgress, progressReceivedAt, generationStartedAt, meshViewer, activeJ
 const splatStages = [['load','Load'], ['preprocess','Prepare'], ['encode','Analyze'], ['sampling','Generate'], ['decode','Build'], ['save','Save'], ['preview','Preview']];
 const meshStages = [['preprocess','Prepare'], ['load','Load'], ['reconstruct','Generate'], ['extract','Surface'], ['simplify','Optimize'], ['texture','Texture'], ['export','Save'], ['preview','Preview']];
 const rigStages = [['rig_prepare','Prepare'],['skeleton','Bones'],['rig_bind','Bind'],['skinning','Weights'],['rig_export','Export'],['rig_verify','Check'],['preview','Preview']];
-let lastMeshJob;
+const conversionStages = [['capture','Views'],['stereo','Depth'],['surface','Surface'],['export','Save'],['preview','Preview']];
+const idolMeshStages = [...splatStages.filter(([stage]) => stage !== 'preview'),...conversionStages];
+let lastMeshJob, lastSplatJob;
 let stages = splatStages.map(([stage]) => stage);
 
 function isMesh() { return $('output_type').value === 'mesh'; }
 
+function isIdolMesh() { return isMesh() && $('mesh_backend').value === 'idol'; }
+
 function syncOutputControls() {
-  $('splat-options').hidden = isMesh();
+  const idol = !isMesh() || isIdolMesh();
+  $('splat-options').hidden = !idol;
   $('mesh-options').hidden = !isMesh();
-  $('splat-options').querySelectorAll('input,select').forEach((input) => { input.disabled = busy || isMesh(); });
-  $('mesh-options').querySelectorAll('input,select').forEach((input) => { input.disabled = busy || !isMesh(); });
+  $('mesh-method-field').hidden = !isMesh();
+  $('mesh_backend').disabled = busy || !isMesh();
+  $('splat-options').querySelectorAll('input,select').forEach((input) => { input.disabled = busy || !idol; });
+  $('legacy-mesh-options').hidden = isIdolMesh();
+  $('legacy-mesh-options').querySelectorAll('input,select').forEach((input) => { input.disabled = busy || !isMesh() || isIdolMesh(); });
+  $('splat-surface-options').hidden = !isIdolMesh();
+  $('splat-surface-options').querySelectorAll('input,select').forEach((input) => { input.disabled = busy || !isIdolMesh(); });
+  $('mesh-note').textContent = isIdolMesh() ? 'Mesh from the Idol result, with embedded vertex colors. Main-subject mode can omit detached parts. Inspect before rigging.' : 'Independent image reconstruction. Inspect the mesh before animation.';
 }
 
-function configureStages(rig = false) {
-  const definitions = rig ? rigStages : (isMesh() ? meshStages : splatStages);
+function configureStages(rig = false, conversion = false) {
+  const definitions = rig ? rigStages : conversion ? conversionStages : isIdolMesh() ? idolMeshStages : (isMesh() ? meshStages : splatStages);
   stages = definitions.map(([stage]) => stage);
   $('stage-list').replaceChildren(...definitions.map(([stage, label]) => {
     const item = document.createElement('span');
@@ -63,10 +74,10 @@ function showProgress(job) {
     if (index === itemIndex) item.setAttribute('aria-current', 'step');
     else item.removeAttribute('aria-current');
   });
-  if (['sampling', 'extract', 'texture'].includes(job.stage) && job.step != null && job.total_steps > 0) {
+  if (['sampling', 'extract', 'texture', 'capture', 'stereo'].includes(job.stage) && job.step != null && job.total_steps > 0) {
     $('generation-bar').max = job.total_steps;
     $('generation-bar').value = job.step;
-    $('step-detail').textContent = job.stage === 'sampling' ? `Sampling step ${job.step} of ${job.total_steps}` : `${job.stage === 'texture' ? 'Texture' : 'Surface'} samples · ${Math.round(job.step / job.total_steps * 100)}%`;
+    $('step-detail').textContent = job.stage === 'capture' ? `Rendered image ${job.step} of ${job.total_steps}` : job.stage === 'stereo' ? `Depth pair ${job.step} of ${job.total_steps}` : job.stage === 'sampling' ? `Sampling step ${job.step} of ${job.total_steps}` : `${job.stage === 'texture' ? 'Texture' : 'Surface'} samples · ${Math.round(job.step / job.total_steps * 100)}%`;
   } else {
     $('generation-bar').removeAttribute('value');
     $('step-detail').textContent = job.stage === 'preview' ? 'Preparing the interactive viewer…' : '';
@@ -87,6 +98,7 @@ async function request(url, options) {
 }
 
 function updateButton() {
+  $('saved-result').disabled = busy;
   $('generate').disabled = busy || !serverReady || !$('image').files.length;
 }
 
@@ -193,13 +205,20 @@ async function watchJob(id) {
       const mesh = rig || job.output_type === 'mesh' || Boolean(job.files['object.glb']);
       const file = rig ? job.files['rigged.glb'] : (mesh ? job.files['object.glb'] : job.files['object.ply']);
       lastMeshJob = rig ? job.source_job : (mesh ? id : undefined);
+      lastSplatJob = mesh ? undefined : id;
+      const colored = mesh && !rig && job.mesh.appearance === 'vertex_colors';
+      $('source-download').hidden = !job.files['source.ply'];
+      if (job.files['source.ply']) $('source-download').href = job.files['source.ply'];
+      const warnings = (rig ? job.rig : job.mesh)?.warnings || [];
+      $('mesh-warnings').hidden = !warnings.length;
+      $('mesh-warnings').textContent = warnings.join(' ');
       $('download').href = file;
       $('download').download = mesh ? 'idol-mesh.glb' : 'idol-object.ply';
       $('download').textContent = mesh ? 'Download .glb ↓' : 'Download .ply ↓';
-      $('result-badge').textContent = rig ? 'EXPERIMENTAL CHARACTER RIG' : mesh ? 'TEXTURED POLYGON MESH' : '3D GAUSSIAN SPLAT';
+      $('result-badge').textContent = rig ? 'EXPERIMENTAL CHARACTER RIG' : colored ? 'SPLAT-DERIVED MESH' : mesh ? 'TEXTURED POLYGON MESH' : '3D GAUSSIAN SPLAT';
       $('download').hidden = false;
-      $('result-info').textContent = rig ? `${job.rig.bones} bones · ${Number(job.rig.triangles).toLocaleString()} triangles · ${job.seconds}s` : mesh ? `${Number(job.mesh.triangles).toLocaleString()} triangles · ${job.mesh.texture_resolution}px texture · ${job.seconds}s` : `${Number(job.settings.num_gaussians).toLocaleString()} Gaussians · ${job.seconds}s · seed ${job.settings.seed}`;
-      showProgress({ stage: 'preview', message: mesh ? 'Opening the textured mesh preview…' : 'Downloading the PLY and preparing the interactive 3D preview…' });
+      $('result-info').textContent = rig ? `${job.rig.bones} bones · ${Number(job.rig.triangles).toLocaleString()} triangles · ${job.seconds}s` : mesh ? `${Number(job.mesh.triangles).toLocaleString()} triangles · ${colored ? 'vertex colors' : `${job.mesh.texture_resolution}px texture`} · ${job.seconds}s` : `${Number(job.settings.num_gaussians).toLocaleString()} Gaussians · ${job.seconds}s · seed ${job.settings.seed}`;
+      showProgress({ stage: 'preview', message: mesh ? 'Opening the mesh preview…' : 'Downloading the PLY and preparing the interactive 3D preview…' });
       try {
         if (mesh) {
           await disposeViewer();
@@ -226,6 +245,8 @@ async function watchJob(id) {
         $('static-download').href = `/outputs/${job.source_job}/object.glb`;
       }
       updateRigControls();
+      updateConversionControls();
+      refreshSavedResults();
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 750));
@@ -237,6 +258,10 @@ $('form').addEventListener('submit', async (event) => {
   if (busy) return;
   busy = true;
   lastMeshJob = undefined;
+  lastSplatJob = undefined;
+  $('conversion-actions').hidden = true;
+  $('source-download').hidden = true;
+  $('mesh-warnings').hidden = true;
   $('rig-actions').hidden = true;
   $('rig-exports').hidden = true;
   updateButton();
@@ -274,19 +299,20 @@ $('form').addEventListener('submit', async (event) => {
     syncOutputControls();
     updateButton();
     updateRigControls();
+    updateConversionControls();
   }
 });
 
 function applyStatus() {
   if (!cachedStatus) return;
-  $('engine-credit').innerHTML = isMesh() ? 'Powered by <a href="https://github.com/VAST-AI-Research/TripoSR" target="_blank" rel="noreferrer">TripoSR</a> · Mesh reconstruction' : 'Powered by <a href="https://github.com/speridlabs/idol-sdk" target="_blank" rel="noreferrer">Idol</a> · Gaussian splatting';
-  const status = isMesh() ? cachedStatus.mesh : cachedStatus;
-  serverReady = Boolean(status?.ready);
-  $('backend-label').textContent = isMesh()
+  $('engine-credit').innerHTML = isIdolMesh() ? 'Powered by Idol · stereo depth · surface fusion' : isMesh() ? 'Powered by <a href="https://github.com/VAST-AI-Research/TripoSR" target="_blank" rel="noreferrer">TripoSR</a> · Mesh reconstruction' : 'Powered by <a href="https://github.com/speridlabs/idol-sdk" target="_blank" rel="noreferrer">Idol</a> · Gaussian splatting';
+  const status = isIdolMesh() ? cachedStatus.splat_mesh : isMesh() ? cachedStatus.mesh : cachedStatus;
+  serverReady = Boolean(status?.ready) && (!isIdolMesh() || Boolean(status?.upload_ready && status?.weights_downloaded));
+  $('backend-label').textContent = isIdolMesh() ? 'Local splat-to-mesh generation · rendering views can take several minutes.' : isMesh()
     ? (status?.weights_downloaded ? 'Models downloaded · mesh generation runs locally.' : 'Local mesh generation. First use downloads its model files.')
     : (status?.weights_downloaded ? 'Models downloaded · inference runs on your GPU.' : 'Inference runs on your GPU. First run downloads the model weights.');
   if (!serverReady) {
-    $('setup').innerHTML = isMesh()
+    $('setup').innerHTML = isIdolMesh() ? '<strong>Finish splat-to-mesh setup.</strong> Run <code>make setup-splat-mesh splat-mesh-models</code>. Image uploads also need <code>make setup-local models</code>.' : isMesh()
       ? '<strong>Finish mesh setup to generate.</strong> Run <code>make setup-mesh mesh-models</code>. Mesh generation uses its own environment and public model files.'
       : '<strong>Finish local setup to generate.</strong> Install the model dependencies with <code>uv sync --extra local</code>. Model weights download automatically from public repositories; no Hugging Face login is required.';
     $('setup').hidden = false;
@@ -296,6 +322,7 @@ function applyStatus() {
   syncOutputControls();
   updateButton();
   updateRigControls();
+  updateConversionControls();
 }
 
 async function checkStatus() {
@@ -310,6 +337,7 @@ async function checkStatus() {
 }
 
 $('output_type').addEventListener('change', () => { syncOutputControls(); applyStatus(); });
+$('mesh_backend').addEventListener('change', () => { syncOutputControls(); applyStatus(); });
 $('wireframe').addEventListener('change', () => meshViewer?.wireframe($('wireframe').checked));
 $('reset-view').addEventListener('click', () => meshViewer?.reset());
 $('cancel').addEventListener('click', async () => {
@@ -369,3 +397,99 @@ $('auto-rig').addEventListener('click', async () => {
     updateRigControls();
   }
 });
+
+function updateConversionControls() {
+  $('conversion-actions').hidden = !lastSplatJob;
+  const ready = cachedStatus?.splat_mesh?.ready && cachedStatus?.splat_mesh?.weights_downloaded;
+  $('convert-mesh').disabled = busy || !ready;
+  $('conversion-note').textContent = ready ? 'Reuse this completed splat. Conversion uses the surface and parts settings from the Idol mesh method.' : 'Set up conversion with make setup-splat-mesh splat-mesh-models.';
+}
+$('convert-mesh').addEventListener('click', async () => {
+  if (busy || !lastSplatJob) return;
+  busy = true;
+  configureStages(false,true);
+  updateButton();
+  updateConversionControls();
+  $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
+  $('cancel').hidden = false;
+  $('cancel').disabled = true;
+  $('message').hidden = true;
+  $('mesh-warnings').hidden = true;
+  $('download').hidden = true;
+  $('source-download').hidden = true;
+  $('empty').hidden = true;
+  $('busy').hidden = false;
+  generationStartedAt = Date.now();
+  showProgress({stage:'starting',message:'Starting mesh conversion from the completed splat…'});
+  const tick = setInterval(updateTiming,1000);
+  try {
+    const body = new URLSearchParams({surface_quality:$('surface_quality').value,component_mode:$('component_mode').value});
+    const job = await request(`/api/jobs/${lastSplatJob}/mesh`,{method:'POST',body});
+    activeJobId = job.id;
+    $('cancel').disabled = false;
+    await disposeViewer();
+    await watchJob(job.id);
+  } catch (error) {
+    showError(error.message);
+    $('result-info').textContent = 'Mesh conversion could not finish. The original splat is preserved.';
+    if (!viewer && !meshViewer) $('empty').hidden = false;
+  } finally {
+    clearInterval(tick);
+    busy = false;
+    activeJobId = undefined;
+    $('busy').hidden = true;
+    $('cancel').hidden = true;
+    $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = false; });
+    syncOutputControls();
+    updateButton();
+    updateRigControls();
+    updateConversionControls();
+  }
+});
+
+async function refreshSavedResults() {
+  try {
+    const data = await request('/api/jobs');
+    const options = (data.jobs || []).map((job) => {
+      const option = document.createElement('option');
+      option.value = job.id;
+      const kind = job.output_type === 'rig' ? 'Rig' : job.output_type === 'mesh' ? 'Mesh' : 'Splat';
+      option.textContent = `${kind} · ${job.started_at ? new Date(job.started_at * 1000).toLocaleString() : job.id.slice(0,8)}`;
+      return option;
+    });
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Recent completed results…';
+    $('saved-result').replaceChildren(placeholder,...options);
+  } catch { /* Saved results are optional while the server is unavailable. */ }
+}
+$('saved-result').addEventListener('change',async () => {
+  const id = $('saved-result').value;
+  if (!id || busy) return;
+  busy = true;
+  updateButton();
+  $('saved-result').disabled = true;
+  $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
+  $('message').hidden = true;
+  $('busy').hidden = false;
+  generationStartedAt = Date.now();
+  try {
+    const job = await request(`/api/jobs/${id}`);
+    if (job.state !== 'complete') throw new Error('This saved result is not complete.');
+    $('output_type').value = job.output_type === 'splat' || !job.output_type ? 'splat' : 'mesh';
+    if (job.output_type === 'mesh') $('mesh_backend').value = job.mesh_backend || 'triposr';
+    configureStages(job.output_type === 'rig');
+    await disposeViewer();
+    await watchJob(id);
+  } catch (error) { showError(error.message); }
+  finally {
+    busy = false;
+    $('busy').hidden = true;
+    $('saved-result').disabled = false;
+    $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = false; });
+    applyStatus();
+    updateRigControls();
+    updateConversionControls();
+  }
+});
+refreshSavedResults();

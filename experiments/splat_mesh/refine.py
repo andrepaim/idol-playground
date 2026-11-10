@@ -36,15 +36,8 @@ def appearance_glb(mesh):
     return struct.pack('<4sII',b'glTF',2,len(chunks)+12)+chunks
 
 
-def main():
-    parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--views',type=Path,required=True)
-    parser.add_argument('--depths',type=Path,required=True)
-    parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--voxel',type=float,default=.002)
-    parser.add_argument('--minimum-component',type=int,default=100)
-    parser.add_argument('--largest-component',action='store_true',help='Keep one connected subject; retain raw.ply for accessories/fragments')
-    args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True);start=time.monotonic()
+def refine(args):
+    args.output.mkdir(parents=True,exist_ok=True);start=time.monotonic()
     manifest=json.loads((args.views/'views.json').read_text())
     volume=o3d.pipelines.integration.ScalableTSDFVolume(voxel_length=args.voxel,sdf_trunc=args.voxel*5,
                                                       color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)
@@ -74,6 +67,19 @@ def main():
             'mesh.glb':'upright glTF Y-up; X rotation pi from the source splat coordinate frame',
             'mesh-reference.glb':'source PLY coordinates for calibrated comparison'}
     (args.output/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+
+    return report
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--views',type=Path,required=True)
+    parser.add_argument('--depths',type=Path,required=True)
+    parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--voxel',type=float,default=.002)
+    parser.add_argument('--minimum-component',type=int,default=100)
+    parser.add_argument('--largest-component',action='store_true',help='Keep one connected subject; retain raw.ply for accessories/fragments')
+    refine(parser.parse_args())
 
 
 if __name__=='__main__':main()

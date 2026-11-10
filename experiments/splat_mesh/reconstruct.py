@@ -72,18 +72,8 @@ def classical_pair(left,right):
             np.fliplr(matcher.compute(np.fliplr(b).copy(),np.fliplr(a).copy()).astype(np.float32)/16)]
 
 
-def main():
-    parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--views',type=Path,required=True)
-    parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--method',choices=['sgbm','dlnr'],default='dlnr')
-    parser.add_argument('--source',type=Path)
-    parser.add_argument('--checkpoint',type=Path)
-    parser.add_argument('--limit',type=int,default=0)
-    parser.add_argument('--iters',type=int,default=10)
-    parser.add_argument('--voxel',type=float,default=.004)
-    parser.add_argument('--status-url',default='http://127.0.0.1:8000/api/status',help='Pause CUDA work while an owner app job is active')
-    args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
+def reconstruct(args,on_progress=None):
+    args.output.mkdir(parents=True,exist_ok=True)
     import open3d as o3d
     started=time.monotonic()
     manifest=json.loads((args.views/'views.json').read_text())
@@ -99,6 +89,7 @@ def main():
     volume=o3d.pipelines.integration.ScalableTSDFVolume(voxel_length=args.voxel,sdf_trunc=args.voxel*5,
                                                       color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)
     pairs=manifest['pairs'][:args.limit or None]
+    if on_progress:on_progress(0,len(pairs))
     for index,pair in enumerate(pairs):
         if model and args.status_url:
             import urllib.request
@@ -124,6 +115,7 @@ def main():
         intrinsic=o3d.camera.PinholeCameraIntrinsic(camera['size'],camera['size'],camera['focal'],camera['focal'],camera['size']/2,camera['size']/2)
         volume.integrate(rgbd,intrinsic,np.asarray(camera['extrinsic']))
         row={'index':index,'valid_pixels':int(valid.sum()),'foreground_pixels':int((alpha>.75).sum()),'seconds':round(time.monotonic()-tick,3)}
+        if on_progress:on_progress(index+1,len(pairs))
         report['views'].append(row);print('STEREO',args.method,index+1,'/',len(pairs),row,flush=True)
     mesh=volume.extract_triangle_mesh();mesh.compute_vertex_normals()
     if not len(mesh.triangles):raise RuntimeError('No stereo surface was recovered')
@@ -138,6 +130,22 @@ def main():
     if model:report['peak_allocated_mib']=round(torch.cuda.max_memory_allocated()/2**20)
     (args.output/'report.json').write_text(json.dumps(report,indent=2))
     print('RECONSTRUCTION COMPLETE',json.dumps({k:v for k,v in report.items() if k!='views'}),flush=True)
+
+    return report
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--views',type=Path,required=True)
+    parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--method',choices=['sgbm','dlnr'],default='dlnr')
+    parser.add_argument('--source',type=Path)
+    parser.add_argument('--checkpoint',type=Path)
+    parser.add_argument('--limit',type=int,default=0)
+    parser.add_argument('--iters',type=int,default=10)
+    parser.add_argument('--voxel',type=float,default=.004)
+    parser.add_argument('--status-url',default='http://127.0.0.1:8000/api/status',help='Pause CUDA work while an owner app job is active')
+    reconstruct(parser.parse_args())
 
 
 if __name__=='__main__':main()

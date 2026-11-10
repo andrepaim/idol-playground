@@ -11,11 +11,13 @@
       <header><a class="wordmark" href="/">idol<span class="dot">●</span></a><span class="eyebrow">IMAGE → 3D PLAYGROUND</span><a class="source" href="https://huggingface.co/speridlabs/idol" target="_blank" rel="noreferrer">Model ↗</a></header>
       <section class="intro"><span class="tag">SPERIDLABS / IDOL</span><h1>A new dimension.<br><span>From a single image.</span></h1><p>Upload an object. Let Idol imagine the other sides.</p></section>
       <div id="setup" class="notice" hidden></div>
+      <div class="saved-results field"><label for="saved-result">Open a saved result</label><select id="saved-result"><option value="">Recent completed results…</option></select></div>
       <section class="workspace">
         <form id="form" class="panel input-panel">
           <div class="panel-heading"><span><b>01</b> Your image</span><span class="small">PNG · JPG · WEBP</span></div>
           <label id="dropzone" class="dropzone" tabindex="0" for="image"><input type="file" id="image" name="image" accept="image/png,image/jpeg,image/webp" required /><div id="upload-prompt"><div class="upload-icon">↥</div><strong>Drop an image here</strong><span>or click to browse · up to 20 MB</span></div><img id="image-preview" alt="Your uploaded object" hidden /><span id="replace" hidden>Click to replace</span></label>
-          <div class="field"><label for="output_type">Output</label><select id="output_type" name="output_type"><option value="splat">3D splat · .ply</option><option value="mesh">Textured mesh · .glb</option></select></div>
+          <div class="field"><label for="output_type">Output</label><select id="output_type" name="output_type"><option value="splat">3D splat · .ply</option><option value="mesh">3D mesh · .glb</option></select></div>
+          <div id="mesh-method-field" class="field" hidden><label for="mesh_backend">Mesh method</label><select id="mesh_backend" name="mesh_backend" disabled><option value="idol" selected>From Idol splat · preferred</option><option value="triposr">TripoSR · legacy</option></select></div>
           <div id="splat-options">
           <div class="field"><label for="mode">Image type</label><select id="mode" name="mode"><option value="real">Real photograph</option><option value="synthetic">Render / AI-generated image</option></select></div>
           <details><summary>Generation settings <span>+</span></summary><div class="settings">
@@ -25,13 +27,18 @@
           </div></details>
           </div>
           <div id="mesh-options" hidden>
+            <div id="splat-surface-options">
+              <div class="field"><label for="surface_quality">Surface detail</label><select id="surface_quality" name="surface_quality" disabled><option value="fine">Fine · preserve more detail</option><option value="balanced">Balanced · lighter surface</option></select></div>
+              <div class="field"><label for="component_mode">Parts to keep</label><select id="component_mode" name="component_mode" disabled><option value="largest">Main connected subject</option><option value="all">Keep all parts</option></select></div>
+            </div>
+            <div id="legacy-mesh-options">
             <div class="field"><label for="target_faces">Triangle budget</label><select id="target_faces" name="target_faces" disabled><option value="10000">10,000 · lighter</option><option value="25000" selected>25,000 · balanced</option><option value="50000">50,000 · detailed</option><option value="100000">100,000 · maximum</option></select></div>
             <div class="field"><label for="texture_resolution">Texture size</label><select id="texture_resolution" name="texture_resolution" disabled><option value="512">512 px · quick test</option><option value="1024" selected>1024 px · balanced</option><option value="2048">2048 px · detailed</option></select></div>
             <details><summary>Mesh settings <span>+</span></summary><div class="settings">
               <div class="field"><label for="mesh_resolution">Surface resolution</label><select id="mesh_resolution" name="mesh_resolution" disabled><option value="128">128 · draft</option><option value="192" selected>192 · standard</option><option value="256">256 · fine</option></select></div>
               <div class="field"><label for="mesh_seed">Seed</label><input id="mesh_seed" name="seed" type="number" min="0" max="2147483647" value="42" required disabled /></div>
             </div></details>
-            <p class="mesh-note">Unrigged mesh. Inspect the geometry before animation.</p>
+            </div><p id="mesh-note" class="mesh-note">Mesh from the Idol result. Main-subject mode can omit detached parts. Inspect before rigging.</p>
           </div>
           <button id="generate" class="primary" type="submit" disabled>Generate 3D object <span>↗</span></button><button id="cancel" class="cancel-button" type="button" hidden>Cancel generation</button><p id="backend-label" class="fine">Connecting to the model server…</p>
         </form>
@@ -43,7 +50,7 @@
             <progress id="generation-bar" max="1" aria-label="Current stage progress"></progress>
             <span id="step-detail"></span>
             <div class="generation-timing"><span id="elapsed">0s elapsed</span><span id="eta">Estimating time remaining…</span></div>
-          </div></div></div><div id="rig-actions" hidden><button id="auto-rig" type="button">Auto rig · experimental</button><p id="rig-note"></p></div><div id="rig-exports" hidden><a id="fbx-download" download>Download FBX</a><a id="blend-download" download>Download Blender file</a><a id="static-download" download>Original static mesh</a><p>Experimental rig. Inspect the skeleton and bend before game use. Generic bone names; retargeting and game animations are separate steps.</p></div><div class="result-footer"><span id="result-info">Ready when you are.</span><a id="download" class="download" hidden download="idol-object.ply">Download .ply ↓</a></div></section>
+          </div></div></div><div id="conversion-actions" hidden><button id="convert-mesh" type="button">Create mesh from this splat</button><p id="conversion-note"></p></div><div id="mesh-warnings" class="mesh-note" hidden></div><div id="rig-actions" hidden><button id="auto-rig" type="button">Auto rig · experimental</button><p id="rig-note"></p></div><div id="rig-exports" hidden><a id="fbx-download" download>Download FBX</a><a id="blend-download" download>Download Blender file</a><a id="static-download" download>Original static mesh</a><p>Experimental rig. Inspect the skeleton and bend before game use. Generic bone names; retargeting and game animations are separate steps.</p></div><div class="result-footer"><span id="result-info">Ready when you are.</span><a id="source-download" class="download" hidden download="source-splat.ply">Source splat ↓</a><a id="download" class="download" hidden download="idol-object.ply">Download .ply ↓</a></div></section>
       </section>
       <p id="message" role="status" aria-live="polite" hidden></p>
       <footer><p>Best with a single, clearly visible object.</p><p id="engine-credit">Powered by <a href="https://github.com/speridlabs/idol-sdk" target="_blank" rel="noreferrer">Idol</a> · Gaussian splatting</p></footer>

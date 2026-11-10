@@ -2,7 +2,7 @@
 
 - [Getting started](getting-started.md): install, download models, and run locally.
 - [Development](development.md): isolated environments and checks.
-- [Textured meshes](mesh-generation.md): setup, GLB controls, settings and quality boundaries.
+- [Polygon meshes](mesh-generation.md): setup, GLB controls, settings and quality boundaries.
 - [Architecture](architecture.md): current API, GPU lifecycle, storage, and viewer.
 - [Validation](validation.md): browser and real-GPU acceptance, evidence, and limitations.
 - [Security](security.md): repository guards and model provenance.
@@ -16,3 +16,5 @@
 - [Experimental automatic rigging](automatic-rigging.md)
 
 - [Splat-derived mesh experiment](splat-mesh-results.md): local fidelity results and reproduction.
+
+- [Splat-mesh integration validation](splat-mesh-integration-validation.md): actual app/GPU acceptance and remaining limits.

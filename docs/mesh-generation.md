@@ -1,33 +1,58 @@
-# Textured mesh generation
+# Polygon mesh generation
 
-Choose **Textured mesh · .glb** in the app to reconstruct a polygon mesh directly from the uploaded photo. This uses TripoSR and produces a different reconstruction from Idol's Gaussian splat. The exported mesh has UV coordinates and an embedded color texture; optional [experimental automatic rigging](automatic-rigging.md) follows mesh inspection.
+Choose **3D mesh · .glb** and **From Idol splat · preferred**. The app generates an Idol Gaussian splat, renders calibrated stereo pairs, predicts depth with DLNR and fuses the surface with Open3D. It exports a vertex-colored GLB derived from the splat rather than a second independent reconstruction of the photo.
 
 ## Setup and use
 
-The accepted platform is Linux/WSL on x86-64 with an NVIDIA GPU. The isolated mesh environment uses Python 3.11 and PyTorch 2.5.1/CUDA 12.4. It does not change Idol's Python environment.
-
-From an existing Idol installation:
+Linux/WSL x86-64 with NVIDIA CUDA is the accepted platform. From an existing Idol installation:
 
 ```sh
-make setup-mesh mesh-models
+make setup-splat-mesh splat-mesh-models
 npm run build
 ./run.sh
 ```
 
-For a mesh-only installation:
+Uploading in this mode also needs `make setup-local models`. Converting a saved splat only needs the stereo environment/assets and the built frontend. The launcher can serve from `.venv-check` if Idol's `.venv` is absent. `make setup-splat-mesh` installs locked Python 3.11, PyTorch 2.5.1/CUDA 12.4, Open3D and Playwright in `.venv-stereo`, installs Chromium, and checks CUDA imports and headless rendering. Minimal systems may need Playwright's system libraries. The setup is independent of TripoSR and UniRig.
 
-```sh
-make bootstrap setup-mesh mesh-models
-./run.sh
-```
+`make splat-mesh-models` pins GS2Mesh source to `560f3e8a2349aaad24fe9444ef1ca2770aeec5ab` and downloads its public DLNR Middlebury checkpoint, verifying SHA-256 `57e46b8fed66b685f732b730ebffd71998dcabea49f8443ca77e015419f6ae18`. Assets remain in ignored `models/splat-mesh`. Complete setup before requesting a job. Workers load local assets with offline model settings; capture serves all resources locally without relying on a running app endpoint.
 
-The launcher prefers `.venv` when present and falls back to `.venv-check`, so the API can serve mesh generation without installing Idol. The separate `.venv-triposr` process performs reconstruction. `make setup-mesh` checks required imports, offscreen rendering, and surface/export regressions. `make mesh-models` downloads the pinned public assets; no Hugging Face login is required. First generation can download missing assets once the environment is installed.
+Upload a clear image, or reopen a completed splat with **Saved results** and click **Create mesh from this splat**. Conversion skips Idol inference and creates a separate job; it never replaces the original splat. The picker includes up to 50 completed results with existing artifacts. Older persisted splat jobs remain supported.
 
-Texture baking needs an OpenGL 3.3 implementation with EGL, normally supplied by Mesa on Linux/WSL. Software EGL is supported; CUDA handles neural reconstruction and texture queries. Triangle extraction uses CPU PyMCubes, avoiding a requirement for a system CUDA compiler. If environment checks fail, resolve the reported EGL/CUDA/library gap before inference.
+## Splat-derived settings and outputs
 
-Select a clear subject. For characters, a full-body image with separated limbs gives reconstruction and later rigging a better starting point. Existing transparency is respected; opaque photos use the pinned U2Net background remover. Inspect the prepared image when segmentation removes or retains unwanted parts.
+| Setting | Values | Default |
+|---|---|---|
+| Surface quality | Fine / Balanced | Fine: 0.002 voxel; Balanced: 0.004 |
+| Components | Largest / All | Largest |
+| Idol settings on upload | Same as normal splat generation | 50 steps, 262,144 Gaussians, seed 42 |
 
-## Controls and outputs
+Capture uses 36 stereo pairs, 512px images, 42° field of view, radius 1.5 and baseline 0.075. Largest-component cleanup can remove detached accessories as well as noise; select All to retain disconnected parts. There is no automatic triangle reduction that changes the approved reconstruction.
+
+Progress reports Idol stages when uploading, actual image and stereo-pair counts, surface fusion and export. ETA includes capture and learns successful timings in `outputs/.splat-mesh-timings.json`. Software WebGL capture is the main bottleneck and can take several minutes; CUDA stereo time alone is not the total duration. Preview loading time is separate.
+
+Jobs retain `object.glb`, `source.ply`, `raw-mesh.ply`, `mesh.json`, settings, prepared image where available, per-phase logs and working captures/depth. Raw PLY retains the colored surface in source-splat coordinates before component cleanup; intermediate fusion data remains in subfolders. `source.ply` preserves the input Gaussians. Completed, failed and cancelled job metadata persists; interrupted work cannot resume.
+
+The viewer supports orbit, zoom, wireframe, reset, warnings and downloads. The GLB uses linear vertex colors and an unlit material, without a UV texture map. It is marked unrigged. [Experimental automatic rigging](automatic-rigging.md) preserves vertex colors through GLB, FBX and Blender exports; FBX consumers may need a material that reads the color attribute.
+
+## Lifecycle and API compatibility
+
+Splat, both mesh methods and rigging share one exclusive slot. Cached Idol tensors are released before mesh/rig workers start. Image-to-mesh Idol inference runs in a cancellable child process; capture, stereo, fusion and export each have bounded workers. Cancellation retains ownership until the worker and its browser descendants stop. The next normal splat request reloads Idol.
+
+`GET /api/status` reports `splat_mesh.ready`, `weights_downloaded` and `upload_ready` independently of legacy `mesh` and `rig`. `POST /api/jobs/{id}/mesh` converts a completed splat, accepting `surface_quality=fine|balanced` and `component_mode=largest|all`. `GET /api/jobs` lists completed result summaries. On `POST /api/generate`, the UI sends `output_type=mesh&mesh_backend=idol`; omitted `output_type` remains splat, and the API's omitted mesh method remains `triposr` for existing clients. Cancellation uses `POST /api/jobs/{id}/cancel`.
+
+## Fidelity and limitations
+
+The accepted dog experiment measured 95.78% mean silhouette agreement over eight held-out cameras. This measures fidelity to that splat's outline, not real anatomy, unseen-surface accuracy, general reconstruction quality or deformation topology. See [experiment results](splat-mesh-results.md) and [integrated validation](splat-mesh-integration-validation.md).
+
+Fine output can exceed 600,000 triangles. Holes, rough details and soft/thin surfaces remain possible. The result is not guaranteed watertight or game-ready. Automatic rigging does not repair anatomy or create clean game topology. Capture acceleration, topology refinement, UV baking, engine import and authored animations remain separate work.
+
+The API validates finite positions, triangle indices, bounds and either valid vertex colors or embedded UV textures. Browser/API tests cover routing, readiness, persistence, cancellation, progress and viewer lifecycle; actual GPU and fidelity acceptance are additionally required for reconstruction changes.
+
+## Legacy TripoSR method
+
+Install with `make setup-mesh mesh-models`, then select the explicit legacy method. This uses a separate `.venv-triposr` and directly predicts a different shape from the photo. It exports UVs and an embedded texture. Software EGL/OpenGL 3.3 is needed for baking. The method remains available for older workflows; it did not meet the owner's shape-fidelity requirement for the tested dog.
+
+## Legacy TripoSR settings and outputs
 
 | Setting | Supported values | Default |
 |---|---|---|

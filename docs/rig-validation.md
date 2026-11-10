@@ -35,3 +35,6 @@ The same API server completed Idol → rigging → Idol in 43.0s / 65.7s / 34.1s
 38 API/logic tests, 30 infrastructure tests, 6 Chromium browser cases, and 3 isolated TripoSR surface/export regressions passed, together with Ruff, ESLint, documentation/link checks, repository data guard and full-history secret scanning. Coverage includes invalid joint hierarchy/references, singular bind matrices, corrupt/unnormalized weights, missing setup/source, exclusive ownership, source preservation, persisted rig metadata, phase failures, ETA history and viewer controls/lifecycle.
 
 This establishes an experimental local reconstruction-and-rigging path. Generic bone names, inferred topology/anatomy, retargeting, engine import, collisions/LODs and authored animation quality still require separate work. Parent feasibility #2 remains open for broader quality acceptance; engine work remains #7. Refer to [automatic rigging](automatic-rigging.md) and the [character roadmap](game-character-plan.md).
+
+
+The later [splat-derived mesh integration](splat-mesh-integration-validation.md) separately validates a dense unlit vertex-color source through full learned rigging and all three export round trips. The earlier texture measurements above remain evidence for the legacy TripoSR path.

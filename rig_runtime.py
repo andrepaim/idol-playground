@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent
 PHASES = ('rig_prepare', 'skeleton', 'rig_bind', 'skinning', 'rig_export', 'rig_verify')
 MESSAGES = dict(zip(PHASES, ('Preparing the mesh for automatic rigging…', 'Predicting the character skeleton…',
                            'Preparing predicted bones for skinning…', 'Predicting skin weights…',
-                           'Preserving textures and exporting the rig…', 'Reimporting and checking character exports…')))
+                           'Preserving appearance and exporting the rig…', 'Reimporting and checking character exports…')))
 
 
 def backend_python():

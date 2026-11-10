@@ -77,6 +77,9 @@ def scene_report():
     bones = set(armature.data.bones.keys())
     if len(bones) < 2:raise ValueError('Export has no usable skeleton')
     vertices = 0
+    colored = 0
+    color_sum = np.zeros(3)
+    color_count = 0
     for mesh in meshes:
         if not any(mod.type == 'ARMATURE' and mod.object == armature for mod in mesh.modifiers):
             raise ValueError('Mesh is not bound to its skeleton')
@@ -85,6 +88,20 @@ def scene_report():
             if not weights or len(weights) > 4 or not np.isfinite(weights).all() or abs(sum(weights)-1) > .002:
                 raise ValueError('Export has invalid skin weights')
         vertices += len(mesh.data.vertices)
+        attribute = mesh.data.color_attributes.active_color
+        if attribute is not None:
+            values = np.empty(len(attribute.data)*4,dtype=np.float32)
+            attribute.data.foreach_get('color',values)
+            values = values.reshape(-1,4)
+            if not len(values) or not np.isfinite(values).all() or values.min() < 0 or values.max() > 1.001:
+                raise ValueError('Export has invalid vertex colors')
+            if attribute.domain == 'POINT':
+                indices = np.empty(len(mesh.data.loops),dtype=np.int32)
+                mesh.data.loops.foreach_get('vertex_index',indices)
+                values = values[indices]
+            color_sum += values[:,:3].sum(axis=0,dtype=np.float64)
+            color_count += len(values)
+            colored += 1
     images = set()
     for mesh in meshes:
         for material in mesh.data.materials:
@@ -95,7 +112,8 @@ def scene_report():
                     if len(image.pixels) == 0 or min(image.size) <= 0:
                         raise ValueError('Export has an unreadable texture')
                     images.add(image.name)
-    return {'bones': len(bones), 'vertices': vertices, 'materials': len(bpy.data.materials), 'images': len(images)}
+    return {'bones': len(bones), 'vertices': vertices, 'materials': len(bpy.data.materials), 'images': len(images),
+            'vertex_color_meshes': colored,'color_mean': (color_sum/max(color_count,1)).tolist()}
 
 
 def export(args):
@@ -103,7 +121,7 @@ def export(args):
     import numpy as np
     from src.inference.merge import transfer
     transfer(str(args.job / 'skin.fbx'), str(args.job / 'input.glb'), str(args.job / 'rigged.glb'))
-    scene_report()
+    original_appearance = scene_report()
     armature = next(obj for obj in bpy.context.scene.objects if obj.type == 'ARMATURE')
     meshes = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH'
               and any(not collection.hide_render for collection in obj.users_collection)]
@@ -158,10 +176,13 @@ def export(args):
                              bake_anim_use_all_actions=False)
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(filepath=str(args.job / 'character.blend'))
-    report = {'backend': 'unirig', 'rigged': True, 'diagnostic_bone': bone.name,
+    report = {'backend': 'unirig', 'rigged': True, 'source_appearance': original_appearance,
+              'appearance': 'vertex_colors' if original_appearance['vertex_color_meshes'] else 'texture', 'diagnostic_bone': bone.name,
               'deformation_max': float(displacement.max()), 'deformed_vertices': int((displacement > 1e-5).sum()),
               'warnings': ['Experimental automatic rig. Inspect bone placement and deformation before game use.',
                            'Generic bone names; engine retargeting and authored animations are separate steps.']}
+    if report['appearance'] == 'vertex_colors':
+        report['warnings'].append('FBX preserves vertex-color data; configure a material that uses those colors in your engine.')
     for stage in ('skeleton', 'skinning'):
         report[stage] = json.loads((args.job / (stage + '-stats.json')).read_text())
     (args.job / 'rig.json').write_text(json.dumps(report, indent=2))
@@ -176,7 +197,14 @@ def verify(args):
         reports[name] = scene_report()
     bpy.ops.wm.open_mainfile(filepath=str(args.job / 'character.blend'), load_ui=False, use_scripts=False)
     reports['character.blend'] = scene_report()
-    if any(item['images'] < 1 for item in reports.values()):raise ValueError('A character export lost its texture')
+    report = json.loads((args.job / 'rig.json').read_text())
+    if report.get('appearance') == 'vertex_colors':
+        import numpy as np
+        expected = report['source_appearance']['color_mean']
+        for name,item in reports.items():
+            if item['vertex_color_meshes'] < 1 or np.max(np.abs(np.asarray(item['color_mean'])-expected)) > .02:
+                raise ValueError('A character export lost or changed its vertex colors: '+name)
+    elif any(item['images'] < 1 for item in reports.values()):raise ValueError('A character export lost its texture')
     if len({item['bones'] for item in reports.values()}) != 1:raise ValueError('Skeleton changed during export round trip')
     report = json.loads((args.job / 'rig.json').read_text())
     report['roundtrips'] = reports

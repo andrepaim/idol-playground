@@ -45,3 +45,9 @@ setup-rig:
 	./scripts/setup-rig.sh
 rig-models:
 	$(if $(wildcard $(LOCAL_PYTHON)),$(LOCAL_PYTHON),$(CHECK_PYTHON)) rig_setup.py
+
+.PHONY: setup-splat-mesh splat-mesh-models
+setup-splat-mesh:
+	./scripts/setup-splat-mesh.sh
+splat-mesh-models:
+	$(if $(wildcard $(LOCAL_PYTHON)),$(LOCAL_PYTHON),$(CHECK_PYTHON)) splat_mesh_setup.py

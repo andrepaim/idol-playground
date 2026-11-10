@@ -1,6 +1,6 @@
 # Splat-derived mesh experiment: results
 
-Status: the local fidelity experiment produced a mesh that preserves the tested dog's shape substantially better than the rejected independent reconstruction. This is a private review artifact and reproducible research workflow; the app's existing Textured mesh option still uses TripoSR. No rigging or product integration was added.
+Status: the local fidelity experiment produced a mesh that preserves the tested dog's shape substantially better than the rejected independent reconstruction. The reviewed workflow is now integrated as the app's preferred mesh method; TripoSR remains an explicit legacy option. The results below describe the original bounded experiment; see [integration validation](splat-mesh-integration-validation.md) for the app path.
 
 ## What ran
 
@@ -41,6 +41,6 @@ Local acceptance: 41 root API/logic tests, 30 infrastructure tests, 6 existing b
 
 The local review artifact contains the interactive upright mesh, measurements, camera-matched images and download. Owner inputs, derived images, meshes, raw depth/disparity and private source hashes remain ignored and were not published to GitHub.
 
-This is sufficient to review splat-derived meshing as the next direction. It does not establish reliable conversion for arbitrary images or game-ready characters. Further app integration should preserve this fidelity check and address capture speed, holes, topology/texture baking and other test subjects before adding rigging.
+This is sufficient to review splat-derived meshing as the next direction. It does not establish reliable conversion for arbitrary images or game-ready characters. The integrated path preserves this fidelity check and offers experimental rigging. Capture speed, holes, topology/texture baking and broader subject coverage remain open.
 
 See the [reproduction instructions](../experiments/splat_mesh/README.md) and [experiment plan](splat-mesh-experiment.md).
