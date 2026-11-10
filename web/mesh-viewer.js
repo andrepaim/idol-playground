@@ -91,6 +91,7 @@ export async function loadMeshViewer(container, url) {
       dispose,
       hasSkeleton: Boolean(skeleton),
       hasAnimation: Boolean(action),
+      orbit: { camera, controls, render() {} },
       skeleton(enabled) { if (skeleton) skeleton.visible = enabled; },
       diagnostic(enabled) { if (action) { if (enabled) action.reset().play(); else action.stop(); } },
       reset() { camera.position.copy(initial); controls.target.set(0, 0, 0); controls.update(); },

@@ -6,7 +6,7 @@ Idol loads lazily and stays in GPU memory after splat completion. Mesh jobs rele
 
 Mesh output is selected with `output_type=mesh` on the generation endpoint; omitting it preserves splat behavior. The UI sends `mesh_backend=idol`; omitted mesh method remains `triposr` for API compatibility. Readiness is separate under `splat_mesh`, `mesh` (legacy) and `rig`. The mesh adapter validates a self-contained vertex-colored or textured GLB, and the mesh viewer disposes its controls, geometry, textures, and renderer before replacement. `POST /api/jobs/{id}/cancel` requests mesh cancellation; ownership remains held until the worker is reaped.
 
-The browser polls `/api/jobs/{id}`, displays stages and adaptive ETA, loads the final PLY with GaussianSplats3D, and offers download. Three.js renderer ownership and disposal support repeated generations.
+The browser polls `/api/jobs/{id}`, displays stages and adaptive ETA, loads the final PLY with GaussianSplats3D, and offers download. `web/turntable.js` records a full orbit of the current preview (splat or mesh) from its canvas with `MediaRecorder`, entirely in the browser. Three.js renderer ownership and disposal support repeated generations.
 
 | Endpoint | Purpose |
 |---|---|

@@ -1,4 +1,5 @@
 import './style.css';
+import { recordTurntable, videoFormat } from './turntable.js';
 
 const $ = (id) => document.getElementById(id);
 let viewer, renderer, resizeObserver, previewUrl, busy = false, serverReady = false;
@@ -99,6 +100,7 @@ async function request(url, options) {
 
 function updateButton() {
   $('saved-result').disabled = busy;
+  $('video-download').disabled = busy;
   $('generate').disabled = busy || !serverReady || !$('image').files.length;
 }
 
@@ -145,6 +147,7 @@ async function disposeViewer() {
   meshViewer?.dispose();
   meshViewer = undefined;
   $('mesh-toolbar').hidden = true;
+  $('video-download').hidden = true;
   resizeObserver?.disconnect();
   try {
     if (viewer) await viewer.dispose();
@@ -234,6 +237,7 @@ async function watchJob(id) {
           await loadViewer(file);
         }
         $('empty').hidden = true;
+        $('video-download').hidden = !videoFormat();
       } catch (error) {
         $('empty').hidden = false;
         showError(`Generation succeeded, but the 3D preview could not load. You can download the ${mesh ? 'GLB' : 'PLY'}. ${error.message}`);
@@ -336,6 +340,36 @@ async function checkStatus() {
   }
 }
 
+$('video-download').addEventListener('click', async () => {
+  const canvas = $('viewer').querySelector('canvas');
+  const orbit = meshViewer ? meshViewer.orbit : viewer && {
+    camera: viewer.camera, controls: viewer.controls, render: () => viewer.forceRenderNextFrame(),
+  };
+  if (busy || !canvas || !orbit) return;
+  busy = true;
+  updateButton();
+  $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
+  $('message').hidden = true;
+  const button = $('video-download');
+  try {
+    const { blob, extension } = await recordTurntable(canvas, orbit, {
+      onProgress: (progress) => { button.textContent = `Recording… ${Math.round(progress * 100)}%`; },
+    });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `idol-turntable.${extension}`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 60000);
+  } catch (error) {
+    showError(`Could not record the video. ${error.message}`);
+  } finally {
+    button.textContent = 'Download video ↓';
+    busy = false;
+    $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = false; });
+    syncOutputControls();
+    updateButton();
+  }
+});
 $('output_type').addEventListener('change', () => { syncOutputControls(); applyStatus(); });
 $('mesh_backend').addEventListener('change', () => { syncOutputControls(); applyStatus(); });
 $('wireframe').addEventListener('change', () => meshViewer?.wireframe($('wireframe').checked));

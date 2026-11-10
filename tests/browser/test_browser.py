@@ -7,7 +7,7 @@ import json
 import struct
 import threading
 
-from PIL import Image
+from PIL import Image, ImageChops
 from playwright.sync_api import sync_playwright, expect
 import pytest
 
@@ -162,6 +162,47 @@ def test_progress_download_and_repeated_viewer(browser_page):
     assert state['submissions'] == 2
     page.set_viewport_size({'width': 390, 'height': 844})
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+
+
+def assert_video(download):
+    assert download.suggested_filename in ('idol-turntable.mp4', 'idol-turntable.webm')
+    data = Path(download.path()).read_bytes()
+    if download.suggested_filename.endswith('.mp4'):
+        assert data[4:8] == b'ftyp'
+    else:
+        assert data.startswith(bytes.fromhex('1a45dfa3'))
+    assert len(data) > 1000
+
+
+def test_turntable_video_download_restores_view(browser_page):
+    page, state = browser_page
+    expect(page.locator('#video-download')).to_be_hidden()
+    upload(page)
+    state['phase'] = 'complete'
+    page.locator('#generate').click()
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#video-download')).to_be_visible()
+    page.wait_for_timeout(2000)
+    before = page.locator('#viewer canvas').screenshot()
+    with page.expect_download(timeout=30000) as info:
+        page.locator('#video-download').click()
+        expect(page.locator('#video-download')).to_be_disabled()
+        expect(page.locator('#video-download')).to_contain_text('Recording')
+    assert_video(info.value)
+    expect(page.locator('#video-download')).to_be_enabled()
+    expect(page.locator('#video-download')).to_have_text('Download video ↓')
+    page.wait_for_timeout(2000)
+    after = page.locator('#viewer canvas').screenshot()
+    # The orbit returns the camera to its start; only splat sort order may change a few pixels slightly.
+    changed = ImageChops.difference(Image.open(BytesIO(before)).convert('L'), Image.open(BytesIO(after)).convert('L'))
+    assert sum(changed.histogram()[24:]) == 0
+    page.locator('#output_type').select_option('mesh')
+    page.locator('#mesh_backend').select_option('triposr')
+    page.locator('#generate').click()
+    expect(page.locator('#mesh-toolbar')).to_be_visible(timeout=20000)
+    with page.expect_download(timeout=30000) as info:
+        page.locator('#video-download').click()
+    assert_video(info.value)
 
 
 def test_failure_releases_controls_for_retry(browser_page):
