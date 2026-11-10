@@ -94,3 +94,7 @@ An additional real GPU check succeeded on this machine's RTX 3060: the official 
 For experimental skeleton prediction, skinning and GLB/FBX/Blender exports after mesh inspection, see [automatic rigging](docs/automatic-rigging.md). Install with `make setup-rig rig-models`.
 
 The [splat-derived mesh results](docs/splat-mesh-results.md) document the fidelity experiment behind the integrated default mesh method. See the [integration plan](docs/splat-mesh-integration.md) and [integration validation](docs/splat-mesh-integration-validation.md).
+
+### Experimental canine walking
+
+Reviewed canine rigs can now create separate four-beat walking jobs, with paw review, progress/ETA, playback controls, and GLB/FBX/Blender downloads. Both in-place and forward clips are included. See [setup, usage and current limits](docs/canine-walking.md). Generic rigs and game-engine acceptance remain separate work.

@@ -56,3 +56,5 @@ splat-mesh-models:
 test-walking-native:
 	PYTHONPATH=. .venv-unirig/bin/python experiments/walking/test_pose_native.py
 	PYTHONPATH=. .venv-unirig/bin/python experiments/walking/test_skin_native.py
+
+	PYTHONPATH=. .venv-unirig/bin/python backends/walking/test_export_native.py

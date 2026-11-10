@@ -21,8 +21,8 @@ def site():
             super().__init__(*args, directory=str(root), **kwargs)
 
         def do_GET(self):
-            if self.path in ('/fixture.ply', '/fixture.glb', '/rig-fixture.glb', '/colored-fixture.glb'):
-                data = colored_bytes() if self.path == '/colored-fixture.glb' else rig_bytes() if self.path == '/rig-fixture.glb' else mesh_bytes() if self.path.endswith('.glb') else splat_bytes()
+            if self.path in ('/fixture.ply', '/fixture.glb', '/rig-fixture.glb', '/colored-fixture.glb', '/walk-fixture.glb'):
+                data = walk_bytes() if self.path == '/walk-fixture.glb' else colored_bytes() if self.path == '/colored-fixture.glb' else rig_bytes() if self.path == '/rig-fixture.glb' else mesh_bytes() if self.path.endswith('.glb') else splat_bytes()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/octet-stream')
                 self.send_header('Content-Length', str(len(data)))
@@ -83,14 +83,20 @@ def browser_page(site):
         page = browser.new_page()
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
-        state = {'phase': 'sampling', 'ready': True, 'mesh_ready': True, 'stereo_ready': True, 'mesh_backend': 'idol', 'conversions': 0, 'saved': [], 'rig_ready': True, 'submissions': 0, 'output_type': 'splat'}
+        state = {'phase': 'sampling', 'ready': True, 'mesh_ready': True, 'stereo_ready': True, 'mesh_backend': 'idol', 'conversions': 0, 'saved': [], 'walk_ready': True, 'walk_supported': True, 'walks': 0, 'rig_ready': True, 'submissions': 0, 'output_type': 'splat'}
 
         def api(route):
             path = route.request.url.split('/api/')[1]
             if path == 'status':
-                route.fulfill(json={'ready': state['ready'], 'weights_downloaded': True, 'mesh': {'ready': state['mesh_ready'], 'weights_downloaded': True}, 'rig': {'ready': state['rig_ready'], 'weights_downloaded': True}, 'splat_mesh': {'ready': state['stereo_ready'], 'weights_downloaded': True, 'upload_ready': state['ready']}})
+                route.fulfill(json={'walk': {'ready':state['walk_ready']}, 'ready': state['ready'], 'weights_downloaded': True, 'mesh': {'ready': state['mesh_ready'], 'weights_downloaded': True}, 'rig': {'ready': state['rig_ready'], 'weights_downloaded': True}, 'splat_mesh': {'ready': state['stereo_ready'], 'weights_downloaded': True, 'upload_ready': state['ready']}})
             elif path == 'jobs':
                 route.fulfill(json={'jobs':state['saved']})
+            elif path.endswith('/walk-profile'):
+                route.fulfill(json={'supported':state['walk_supported'],'profile':'canine-34-v1',
+                                    'paws':{'fore_left':'bone_14','fore_right':'bone_19','hind_left':'bone_27','hind_right':'bone_33'},'reason':'Reviewed canine profile' if state['walk_supported'] else 'Unsupported skeleton'})
+            elif path.endswith('/walk'):
+                state['walks']+=1;state.update(output_type='walk',phase='walk_bake')
+                route.fulfill(status=202,json={'id':'walk-fixture'})
             elif path.endswith('/mesh'):
                 state.update(output_type='mesh',mesh_backend='idol',phase='capture')
                 state['conversions']+=1
@@ -125,6 +131,10 @@ def browser_page(site):
                             job.update(mesh={'triangles':1,'appearance':'vertex_colors','warnings':['Dense mesh; inspect surface holes before rigging.']},files={'object.glb':'/colored-fixture.glb','source.ply':'/fixture.ply'})
                 if phase == 'complete' and state['output_type'] == 'rig':
                     job.update(output_type='rig',source_job='fixture',rig={'bones':2,'triangles':1},files={'rigged.glb':'/rig-fixture.glb','rigged.fbx':'/rigged.fbx','character.blend':'/character.blend'})
+                if phase == 'complete' and state['output_type'] == 'walk':
+                    job.update(id='walk-fixture',output_type='walk',source_job='rig-fixture',settings={'speed':'relaxed','motion':'forward'},
+                               walk={'bones':2,'triangles':1,'duration':1.25,'stride':.16,'ground_z':0,'warnings':['Experimental canine walk']},
+                               files={'animated.glb':'/walk-fixture.glb','walk-inplace.glb':'/walk-fixture.glb','walk-forward.glb':'/walk-fixture.glb','animated.fbx':'/animated.fbx','character.blend':'/character.blend','walk.json':'/walk.json'})
                 route.fulfill(json=job)
 
         page.route('**/api/**', api)
@@ -357,3 +367,100 @@ def test_default_mesh_missing_setup_is_independent_from_legacy_mesh(browser_page
     expect(page.locator('#setup')).to_contain_text('make setup-splat-mesh splat-mesh-models')
     page.locator('#mesh_backend').select_option('triposr')
     expect(page.locator('#generate')).to_be_enabled()
+
+
+def test_walk_review_progress_playback_cancel_and_saved_reopening(browser_page):
+    page,state=browser_page
+    state.update(output_type='rig',phase='complete',saved=[{'id':'rig-fixture','output_type':'rig','started_at':1}])
+    page.reload();page.locator('#saved-result').select_option('rig-fixture')
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#walk-actions')).to_be_visible()
+    expect(page.locator('#create-walk')).to_be_disabled()
+    page.locator('#paw-fore_left').focus()
+    page.locator('#walk-reviewed').check()
+    page.locator('#create-walk').click()
+    expect(page.locator('#step-detail')).to_contain_text('Contact frame')
+    expect(page.locator('#eta')).to_contain_text('remaining')
+    page.locator('#cancel').click()
+    expect(page.locator('#busy')).to_be_hidden()
+    expect(page.locator('#create-walk')).to_be_enabled()
+    page.locator('#create-walk').click()
+    expect(page.locator('#cancel')).to_be_enabled()
+    state['phase']='complete'
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#walk-playback')).to_be_visible()
+    expect(page.locator('#walk-exports')).to_be_visible()
+    expect(page.locator('#bend-control')).to_be_hidden()
+    expect(page.locator('#message')).to_be_hidden()
+    expect(page.locator('#result-badge')).to_have_text('EXPERIMENTAL CANINE WALK')
+    page.locator('#walk-play').click()
+    expect(page.locator('#walk-play')).to_have_text('Play')
+    page.locator('#walk-play-speed').select_option('0.5')
+    page.locator('#walk-time').fill('0.6');page.locator('#walk-time').dispatch_event('input')
+    assert float(page.locator('#walk-time').input_value()) == pytest.approx(.6,abs=.01)
+    page.locator('#walk-play').click();page.wait_for_timeout(250)
+    assert float(page.locator('#walk-time').input_value()) > .6
+    page.locator('#walk-floor').uncheck();page.locator('#walk-follow').uncheck()
+    page.locator('#skeleton').check();page.locator('#walk-rest').click()
+    page.locator('#walk-restart').click();page.locator('#reset-view').click()
+    expect(page.locator('#walk-source')).to_have_attribute('href','/outputs/rig-fixture/rigged.glb')
+    assert state['walks']==2
+    state['saved']=[{'id':'walk-fixture','output_type':'walk','started_at':2}]
+    page.reload();page.locator('#saved-result').select_option('walk-fixture')
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#walk-playback')).to_be_visible()
+    expect(page.locator('#viewer canvas')).to_have_count(1)
+    upload(page);page.locator('#generate').click()
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#walk-playback')).to_be_hidden()
+    expect(page.locator('#walk-actions')).to_be_hidden()
+    expect(page.locator('#walk-exports')).to_be_hidden()
+
+
+def test_unsupported_rig_shows_walk_reason_without_start_button(browser_page):
+    page,state=browser_page
+    state.update(output_type='rig',phase='complete',walk_supported=False,saved=[{'id':'rig-fixture','output_type':'rig','started_at':1}])
+    page.reload();page.locator('#saved-result').select_option('rig-fixture')
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#walk-note')).to_have_text('Unsupported skeleton')
+    expect(page.locator('#paw-review')).to_be_hidden()
+
+
+def walk_bytes():
+    data=rig_bytes();length=struct.unpack_from('<I',data,12)[0]
+    doc=json.loads(data[20:20+length]);blob=bytearray(data[28+length:])
+    doc['nodes'][1]['name']='bone_0';doc['nodes'][2]['name']='bone_14'
+    offset=len(blob);blob.extend(struct.pack('<9f',0,0,0,.08,0,0,.16,0,0))
+    view=len(doc['bufferViews']);doc['bufferViews'].append({'buffer':0,'byteOffset':offset,'byteLength':36})
+    accessor=len(doc['accessors']);doc['accessors'].append({'bufferView':view,'componentType':5126,'type':'VEC3','count':3})
+    animation=doc['animations'][0];animation['name']='Walk_forward'
+    animation['samplers'].append({'input':animation['samplers'][0]['input'],'output':accessor,'interpolation':'LINEAR'})
+    animation['channels'].append({'sampler':1,'target':{'node':1,'path':'translation'}})
+    doc['buffers'][0]['byteLength']=len(blob)
+    encoded=json.dumps(doc).encode();encoded+=b' '*(-len(encoded)%4)
+    chunks=struct.pack('<I4s',len(encoded),b'JSON')+encoded+struct.pack('<I4s',len(blob),b'BIN\0')+blob
+    return struct.pack('<4sII',b'glTF',2,len(chunks)+12)+chunks
+
+
+def test_forward_loop_accumulates_without_jumping_and_follow_camera_tracks(browser_page):
+    page,state=browser_page
+    module='/assets/'+next((Path(__file__).resolve().parents[2]/'dist/assets').glob('mesh-viewer-*.js')).name
+    page.evaluate("""async (moduleUrl) => {
+      const module=await import(moduleUrl);
+      const container=document.createElement('div');container.style='width:600px;height:400px';document.body.appendChild(container);
+      window.testWalk=await Object.values(module).find((value)=>typeof value==='function')(container,'/walk-fixture.glb',{walking:true,stride:.16,ground:0});
+      window.testWalk.seek(1.22);
+    }""",module)
+    before=page.evaluate('window.testWalk.state()')
+    page.evaluate('window.testWalk.play(true)')
+    page.wait_for_function('window.testWalk.state().travel >= .16')
+    page.evaluate('window.testWalk.play(false)')
+    after=page.evaluate('window.testWalk.state()')
+    assert 0 <= after['root'][0]-before['root'][0] < .06
+    assert after['target'][0]-before['target'][0] == pytest.approx(after['root'][0]-before['root'][0],abs=.001)
+    page.evaluate('window.testWalk.speed(.5);window.testWalk.seek(.6)')
+    assert page.evaluate('window.testWalk.state().time') == pytest.approx(.6)
+    assert page.evaluate('window.testWalk.state().travel') == 0
+    page.evaluate('window.testWalk.restart();window.testWalk.play(false)')
+    assert page.evaluate('window.testWalk.state().time') == pytest.approx(0,abs=.05)
+    page.evaluate('window.testWalk.dispose()')
