@@ -1,6 +1,6 @@
 # Repository and development infrastructure plan
 
-Status: bootstrap in progress under issue #1. The user authorized execution and selected a public repository. The sections below retain the original plan; effective settings and acceptance are recorded in the bootstrap evidence document when complete. Character-model installation remains future work.
+Status: implemented under issue #1; final integration is tracked in its PR. The user authorized execution and selected a public repository. The sections below retain the original plan; effective settings and acceptance are recorded in [bootstrap validation](bootstrap-validation.md). Character-model installation remains future work.
 
 ## Objective
 
