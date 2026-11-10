@@ -22,3 +22,5 @@
 - [Natural dog walking plan](natural-walking-plan.md): motion reference, standing-pose gate, retargeting and app milestones.
 
 - [Walking feasibility findings](walking-feasibility.md): standing deformation measurements and the remaining rig-correction dependency.
+
+- [Rig correction and motion trial](rig-correction-results.md): surface weight transfer, pose-export regression and remaining walk gates.

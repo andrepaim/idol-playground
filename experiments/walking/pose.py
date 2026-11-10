@@ -66,8 +66,12 @@ def run(args):
     armatures=[o for o in bpy.context.scene.objects if o.type=='ARMATURE']
     if len(armatures)!=1:raise ValueError('Expected one target armature')
     armature=armatures[0];armature.animation_data_clear()
+    for bone in armature.pose.bones:
+        basis=bone.matrix_basis.copy();bone.rotation_mode='QUATERNION';bone.matrix_basis=basis
     rows=validate_mapping(mapping['joints'],set(armature.data.bones.keys()),set(directions))
-    meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']
+    meshes=[o for o in bpy.context.scene.objects if o.type=='MESH' and any(
+        modifier.type=='ARMATURE' and modifier.object==armature for modifier in o.modifiers)]
+    if not meshes:raise ValueError('No mesh is bound to the target armature')
     def vertices():
         bpy.context.view_layer.update();graph=bpy.context.evaluated_depsgraph_get();result=[]
         for obj in meshes:
@@ -100,16 +104,26 @@ def run(args):
     report={'deformation':summarize_stretch(posed[valid]/original[valid]),'mapped_joints':len(rows),
             'source_sha256':digest,'motion_sha256':hashlib.sha256(args.motion.read_bytes()).hexdigest(),
             'mapping':mapping,'reference_frame':args.frame,'scope':'Pose feasibility only; requires visual review and contact validation.'}
+    saved_pose={bone.name:(bone.location.copy(),bone.rotation_quaternion.copy(),bone.scale.copy())
+                for bone in armature.pose.bones}
     args.output.mkdir(parents=True)
     bpy.context.scene.frame_start=1;bpy.context.scene.frame_end=2
+    armature.animation_data_create()
+    armature.animation_data.action=bpy.data.actions.new('Standing feasibility')
+    action=armature.animation_data.action
     for bone in armature.pose.bones:
-        bone.rotation_mode='QUATERNION'
-        for frame in (1,2):
-            for channel in ('location','rotation_quaternion','scale'):bone.keyframe_insert(data_path=channel,frame=frame)
+        for channel,values in zip(('location','rotation_quaternion','scale'),saved_pose[bone.name]):
+            for index,value in enumerate(values):
+                curve=action.fcurves.new(bone.path_from_id(channel),index=index,action_group=bone.name)
+                curve.keyframe_points.add(2)
+                curve.keyframe_points.foreach_set('co',[1,value,2,value]);curve.update()
     armature.animation_data.action.name='Standing feasibility'
-    bpy.context.scene.frame_set(1)
+    action.update_tag();armature.update_tag(refresh={'TIME'})
+    bpy.context.scene.frame_set(0);bpy.context.scene.frame_set(1);bpy.context.view_layer.update()
     bpy.ops.export_scene.gltf(filepath=str((args.output/'pose.glb').resolve()),export_format='GLB',
-                              export_animations=True,export_frame_range=True,export_force_sampling=True)
+                              export_animations=True,export_frame_range=True,export_force_sampling=True,
+                              export_animation_mode='ACTIVE_ACTIONS',export_anim_single_armature=False,
+                              export_nla_strips_merged_animation_name='Standing feasibility')
     if hashlib.sha256(args.input.read_bytes()).hexdigest()!=digest:raise ValueError('Source changed during probe')
     (args.output/'report.json').write_text(json.dumps(report,indent=2))
     print(json.dumps(report['deformation']),flush=True)
