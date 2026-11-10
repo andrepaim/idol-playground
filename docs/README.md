@@ -8,7 +8,7 @@
 - [Security](security.md): repository guards and model provenance.
 - [Releases](releases.md): explicit publication workflow.
 - [Repository bootstrap plan](repository-bootstrap-plan.md): foundation scope and acceptance.
-- [Game Character plan](game-character-plan.md): mesh stage implemented; rigging/animation roadmap.
+- [Game Character plan](game-character-plan.md): experimental mesh/rigging MVP and remaining game workflow.
 - [Agent policy draft](agents-policy-draft.md): historical source for the active [root policy](../AGENTS.md).
 
 [Bootstrap acceptance and effective settings](bootstrap-validation.md) records checks, hardware evidence, and access limitations.

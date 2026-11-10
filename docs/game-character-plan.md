@@ -1,10 +1,10 @@
 # Game Character generation plan
 
-Status: in progress. The direct photo-to-textured-mesh increment is implemented and under validation; automatic rigging and animation remain subsequent work. See [mesh generation](mesh-generation.md) and the [implementation plan](photo-mesh-implementation.md).
+Status: experimental MVP implemented. PR #17 adds textured mesh generation; PR #18 adds local skeleton prediction, skinning, diagnostic bend preview and GLB/FBX/Blender exports. Geometry-quality refinement, engine import/retargeting and authored animations remain future work. See [mesh generation](mesh-generation.md), [automatic rigging](automatic-rigging.md) and [actual validation](rig-validation.md).
 
-Add a **Game Character** mode that turns an uploaded image into a textured, rigged mesh, with a browser preview and downloadable files for a game engine.
+The current UI exposes **Textured mesh** followed by **Auto rig · experimental**. This roadmap retains the broader **Game Character** target: useful character geometry and validated assets for a selected game engine.
 
-The proposed pipeline is **TripoSR → Blender processing → UniRig → export and validation**. The first milestone must prove that the complete pipeline works on the local NVIDIA RTX 3060 with 12 GB VRAM and produces useful character geometry. Individual models running successfully is only part of that test.
+The implemented baseline is **TripoSR → mesh cleanup/UV baking → UniRig → Blender export and validation**. Actual tests prove sequential local execution on the NVIDIA RTX 3060 with 12 GB VRAM. Broader geometry/deformation quality acceptance remains open; individual models running successfully does not establish game-ready characters.
 
 This plan assumes engine-neutral exports until a target engine is selected. All inference runs locally.
 
