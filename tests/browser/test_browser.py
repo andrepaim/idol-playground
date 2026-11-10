@@ -21,8 +21,8 @@ def site():
             super().__init__(*args, directory=str(root), **kwargs)
 
         def do_GET(self):
-            if self.path in ('/fixture.ply', '/fixture.glb'):
-                data = mesh_bytes() if self.path.endswith('.glb') else splat_bytes()
+            if self.path in ('/fixture.ply', '/fixture.glb', '/rig-fixture.glb'):
+                data = rig_bytes() if self.path == '/rig-fixture.glb' else mesh_bytes() if self.path.endswith('.glb') else splat_bytes()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/octet-stream')
                 self.send_header('Content-Length', str(len(data)))
@@ -83,16 +83,20 @@ def browser_page(site):
         page = browser.new_page()
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
-        state = {'phase': 'sampling', 'ready': True, 'mesh_ready': True, 'submissions': 0, 'output_type': 'splat'}
+        state = {'phase': 'sampling', 'ready': True, 'mesh_ready': True, 'rig_ready': True, 'submissions': 0, 'output_type': 'splat'}
 
         def api(route):
             path = route.request.url.split('/api/')[1]
             if path == 'status':
-                route.fulfill(json={'ready': state['ready'], 'weights_downloaded': True, 'mesh': {'ready': state['mesh_ready'], 'weights_downloaded': True}})
+                route.fulfill(json={'ready': state['ready'], 'weights_downloaded': True, 'mesh': {'ready': state['mesh_ready'], 'weights_downloaded': True}, 'rig': {'ready': state['rig_ready'], 'weights_downloaded': True}})
             elif path == 'generate':
                 state['output_type'] = 'mesh' if b'name="output_type"\r\n\r\nmesh' in route.request.post_data_buffer else 'splat'
                 state['submissions'] += 1
                 route.fulfill(status=202, json={'id': 'fixture'})
+            elif path.endswith('/rig'):
+                state['output_type'] = 'rig'
+                state['phase'] = 'skeleton'
+                route.fulfill(status=202,json={'id':'rig-fixture'})
             elif path.endswith('/cancel'):
                 state['phase'] = 'cancelled'
                 route.fulfill(status=202, json={'state': 'cancelling'})
@@ -110,6 +114,8 @@ def browser_page(site):
                                files={'object.ply': '/fixture.ply'})
                     if state['output_type'] == 'mesh':
                         job.update(output_type='mesh', mesh={'triangles': 1, 'texture_resolution': 512}, files={'object.glb': '/fixture.glb'})
+                if phase == 'complete' and state['output_type'] == 'rig':
+                    job.update(output_type='rig',source_job='fixture',rig={'bones':2,'triangles':1},files={'rigged.glb':'/rig-fixture.glb','rigged.fbx':'/rigged.fbx','character.blend':'/character.blend'})
                 route.fulfill(json=job)
 
         page.route('**/api/**', api)
@@ -219,3 +225,60 @@ def test_mesh_cancel_and_missing_backend(browser_page):
     upload(page)
     expect(page.locator('#setup')).to_contain_text('make setup-mesh mesh-models')
     expect(page.locator('#generate')).to_be_disabled()
+
+
+def rig_bytes():
+    data=mesh_bytes();length=struct.unpack_from('<I',data,12)[0]
+    doc=json.loads(data[20:20+length]);blob=bytearray(data[28+length:])
+    def add(rows,code,kind,width):
+        while len(blob)%4:blob.append(0)
+        begin=len(blob)
+        for row in rows:blob.extend(struct.pack('<'+code*width,*row))
+        view=len(doc['bufferViews']);doc['bufferViews'].append({'buffer':0,'byteOffset':begin,'byteLength':len(blob)-begin})
+        index=len(doc['accessors']);doc['accessors'].append({'bufferView':view,'componentType':5126 if code=='f' else 5123,'type':kind,'count':len(rows)})
+        return index
+    joints=add([(0,1,0,0)]*3,'H','VEC4',4)
+    weights=add([(1,0,0,0),(.5,.5,0,0),(0,1,0,0)],'f','VEC4',4)
+    bind=add([(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1),(1,0,0,0,0,1,0,0,0,0,1,0,0,-.5,0,1)],'f','MAT4',16)
+    times=add([(0,),(.625,),(1.25,)],'f','SCALAR',1)
+    doc['accessors'][times].update(min=[0],max=[1.25])
+    rotations=add([(0,0,0,1),(math.sin(.125),0,0,math.cos(.125)),(0,0,0,1)],'f','VEC4',4)
+    doc['nodes']=[{'mesh':0,'skin':0},{'name':'root','children':[2]},{'name':'bend','translation':[0,.5,0]}]
+    doc['scenes']=[{'nodes':[0,1]}]
+    doc['skins']=[{'joints':[1,2],'inverseBindMatrices':bind}]
+    doc['meshes'][0]['primitives'][0]['attributes'].update(JOINTS_0=joints,WEIGHTS_0=weights)
+    doc['animations']=[{'name':'Diagnostic bend','samplers':[{'input':times,'output':rotations,'interpolation':'LINEAR'}],
+                        'channels':[{'sampler':0,'target':{'node':2,'path':'rotation'}}]}]
+    doc['buffers'][0]['byteLength']=len(blob)
+    encoded=json.dumps(doc).encode();encoded+=b' '*(-len(encoded)%4);blob+=bytes(-len(blob)%4)
+    chunks=struct.pack('<I4s',len(encoded),b'JSON')+encoded+struct.pack('<I4s',len(blob),b'BIN\0')+blob
+    return struct.pack('<4sII',b'glTF',2,len(chunks)+12)+chunks
+
+
+def test_experimental_rig_controls_progress_animation_and_exports(browser_page):
+    page,state=browser_page
+    page.locator('#output_type').select_option('mesh')
+    upload(page);page.locator('#generate').click()
+    state['phase']='complete'
+    expect(page.locator('#auto-rig')).to_be_enabled(timeout=20000)
+    page.locator('#auto-rig').click()
+    expect(page.locator('#progress')).to_contain_text('Generating synthetic fixture')
+    expect(page.locator('[data-stage="skeleton"]')).to_have_attribute('aria-current','step')
+    expect(page.locator('#cancel')).to_be_enabled()
+    state['phase']='complete'
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#result-info')).to_contain_text('2 bones')
+    expect(page.locator('#skeleton-control')).to_be_visible()
+    expect(page.locator('#bend-control')).to_be_visible()
+    page.locator('#skeleton').check();page.locator('#bend').check()
+    page.wait_for_timeout(500)
+    page.locator('#bend').uncheck();page.locator('#reset-view').click()
+    expect(page.locator('#fbx-download')).to_have_attribute('href','/rigged.fbx')
+    expect(page.locator('#blend-download')).to_have_attribute('href','/character.blend')
+    expect(page.locator('#static-download')).to_have_attribute('href','/outputs/fixture/object.glb')
+    expect(page.locator('#viewer canvas')).to_have_count(1)
+    page.locator('#output_type').select_option('splat');page.locator('#generate').click()
+    expect(page.locator('#busy')).to_be_hidden(timeout=20000)
+    expect(page.locator('#rig-exports')).to_be_hidden()
+    expect(page.locator('#rig-actions')).to_be_hidden()
+    expect(page.locator('#viewer canvas')).to_have_count(1)

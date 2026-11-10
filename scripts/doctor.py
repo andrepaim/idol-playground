@@ -33,6 +33,9 @@ def main():
                                  '--format=csv,noheader'], capture_output=True, text=True)
         report['nvidia_smi'] = result.stdout.strip() if result.returncode == 0 else 'unavailable'
     report['mesh'] = {'environment_installed': backend_installed(), 'models_ready': mesh_models_ready()}
+    from rig_runtime import backend_installed as rig_installed
+    from rig_setup import models_ready as rig_ready
+    report['rig'] = {'environment_installed': rig_installed(), 'models_ready': rig_ready()}
     report['generation_ready'] = all(report[key] for key in ('cuda', 'idol_installed', 'models_ready', 'frontend_built'))
     report['next_step'] = 'make run' if report['generation_ready'] else 'For generation: make setup-local models; npm run build. See docs/getting-started.md.'
     print(json.dumps(report, indent=2))

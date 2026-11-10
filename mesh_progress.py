@@ -8,31 +8,35 @@ BASE = {'preprocess': 8, 'load': 8, 'reconstruct': 4, 'extract': 20, 'simplify':
 
 
 class MeshProgress:
-    def __init__(self, settings, emit, history_path, clock=time.monotonic):
+    def __init__(self, settings, emit, history_path, clock=time.monotonic, *, stages=STAGES, baseline=BASE, scales=None):
+        self.stages = stages
         self.settings, self.emit, self.history_path, self.clock = settings, emit, history_path, clock
         self.started = self.stage_started = clock()
         self.stage = None
         self.step = self.total_steps = None
         self.message = 'Starting mesh generation…'
         self.durations = {}
-        self.scale = {stage: 1 for stage in STAGES}
-        self.scale['extract'] = (settings['mesh_resolution'] / 192) ** 3
-        self.scale['texture'] = (settings['texture_resolution'] / 1024) ** 2
-        self.scale['export'] = settings['target_faces'] / 25000
+        self.scale = {stage: 1 for stage in self.stages}
+        if scales is None:
+            self.scale.update(extract=(settings['mesh_resolution'] / 192) ** 3,
+                              texture=(settings['texture_resolution'] / 1024) ** 2,
+                              export=settings['target_faces'] / 25000)
+        else:
+            self.scale.update(scales)
         try:
             raw = json.loads(history_path.read_text())
-            self.history = {k: v for k, v in raw.items() if k in STAGES and isinstance(v, (int, float)) and math.isfinite(v) and v > 0}
+            self.history = {k: v for k, v in raw.items() if k in self.stages and isinstance(v, (int, float)) and math.isfinite(v) and v > 0}
         except (OSError, ValueError, TypeError, AttributeError):
             self.history = {}
-        self.estimates = {stage: self.history.get(stage, BASE[stage]) * self.scale[stage] for stage in STAGES}
+        self.estimates = {stage: self.history.get(stage, baseline[stage]) * self.scale[stage] for stage in self.stages}
 
     def event(self, event):
         stage = event.get('stage')
-        if stage not in STAGES:
+        if stage not in self.stages:
             return
         now = self.clock()
         if stage != self.stage:
-            if self.stage in STAGES:
+            if self.stage in self.stages:
                 self.durations[self.stage] = now - self.stage_started
             self.stage, self.stage_started = stage, now
             self.step = self.total_steps = None
@@ -48,14 +52,14 @@ class MeshProgress:
     def snapshot(self):
         now = self.clock()
         eta = None
-        if self.stage in STAGES:
+        if self.stage in self.stages:
             eta = max(0, self.estimates[self.stage] - (now - self.stage_started))
-            eta += sum(self.estimates[stage] for stage in STAGES[STAGES.index(self.stage) + 1:])
+            eta += sum(self.estimates[stage] for stage in self.stages[self.stages.index(self.stage) + 1:])
         return {'elapsed_seconds': round(max(0, now - self.started), 1),
                 'eta_seconds': None if eta is None else round(eta, 1)}
 
     def finish(self):
-        if self.stage in STAGES:
+        if self.stage in self.stages:
             self.durations[self.stage] = self.clock() - self.stage_started
         try:
             history = {**self.history, **{stage: .3 * self.history.get(stage, duration / self.scale[stage])

@@ -5,6 +5,8 @@ let viewer, renderer, resizeObserver, previewUrl, busy = false, serverReady = fa
 let latestProgress, progressReceivedAt, generationStartedAt, meshViewer, activeJobId, cachedStatus;
 const splatStages = [['load','Load'], ['preprocess','Prepare'], ['encode','Analyze'], ['sampling','Generate'], ['decode','Build'], ['save','Save'], ['preview','Preview']];
 const meshStages = [['preprocess','Prepare'], ['load','Load'], ['reconstruct','Generate'], ['extract','Surface'], ['simplify','Optimize'], ['texture','Texture'], ['export','Save'], ['preview','Preview']];
+const rigStages = [['rig_prepare','Prepare'],['skeleton','Bones'],['rig_bind','Bind'],['skinning','Weights'],['rig_export','Export'],['rig_verify','Check'],['preview','Preview']];
+let lastMeshJob;
 let stages = splatStages.map(([stage]) => stage);
 
 function isMesh() { return $('output_type').value === 'mesh'; }
@@ -16,8 +18,8 @@ function syncOutputControls() {
   $('mesh-options').querySelectorAll('input,select').forEach((input) => { input.disabled = busy || !isMesh(); });
 }
 
-function configureStages() {
-  const definitions = isMesh() ? meshStages : splatStages;
+function configureStages(rig = false) {
+  const definitions = rig ? rigStages : (isMesh() ? meshStages : splatStages);
   stages = definitions.map(([stage]) => stage);
   $('stage-list').replaceChildren(...definitions.map(([stage, label]) => {
     const item = document.createElement('span');
@@ -187,14 +189,16 @@ async function watchJob(id) {
       return;
     }
     if (job.state === 'complete') {
-      const mesh = job.output_type === 'mesh' || Boolean(job.files['object.glb']);
-      const file = mesh ? job.files['object.glb'] : job.files['object.ply'];
+      const rig = job.output_type === 'rig';
+      const mesh = rig || job.output_type === 'mesh' || Boolean(job.files['object.glb']);
+      const file = rig ? job.files['rigged.glb'] : (mesh ? job.files['object.glb'] : job.files['object.ply']);
+      lastMeshJob = rig ? job.source_job : (mesh ? id : undefined);
       $('download').href = file;
       $('download').download = mesh ? 'idol-mesh.glb' : 'idol-object.ply';
       $('download').textContent = mesh ? 'Download .glb ↓' : 'Download .ply ↓';
-      $('result-badge').textContent = mesh ? 'TEXTURED POLYGON MESH' : '3D GAUSSIAN SPLAT';
+      $('result-badge').textContent = rig ? 'EXPERIMENTAL CHARACTER RIG' : mesh ? 'TEXTURED POLYGON MESH' : '3D GAUSSIAN SPLAT';
       $('download').hidden = false;
-      $('result-info').textContent = mesh ? `${Number(job.mesh.triangles).toLocaleString()} triangles · ${job.mesh.texture_resolution}px texture · ${job.seconds}s` : `${Number(job.settings.num_gaussians).toLocaleString()} Gaussians · ${job.seconds}s · seed ${job.settings.seed}`;
+      $('result-info').textContent = rig ? `${job.rig.bones} bones · ${Number(job.rig.triangles).toLocaleString()} triangles · ${job.seconds}s` : mesh ? `${Number(job.mesh.triangles).toLocaleString()} triangles · ${job.mesh.texture_resolution}px texture · ${job.seconds}s` : `${Number(job.settings.num_gaussians).toLocaleString()} Gaussians · ${job.seconds}s · seed ${job.settings.seed}`;
       showProgress({ stage: 'preview', message: mesh ? 'Opening the textured mesh preview…' : 'Downloading the PLY and preparing the interactive 3D preview…' });
       try {
         if (mesh) {
@@ -203,6 +207,10 @@ async function watchJob(id) {
           meshViewer = await loadMeshViewer($('viewer'), file);
           $('wireframe').checked = false;
           $('mesh-toolbar').hidden = false;
+          $('skeleton').checked = false;
+          $('bend').checked = false;
+          $('skeleton-control').hidden = !meshViewer.hasSkeleton;
+          $('bend-control').hidden = !meshViewer.hasAnimation;
         } else {
           await loadViewer(file);
         }
@@ -211,6 +219,13 @@ async function watchJob(id) {
         $('empty').hidden = false;
         showError(`Generation succeeded, but the 3D preview could not load. You can download the ${mesh ? 'GLB' : 'PLY'}. ${error.message}`);
       }
+      $('rig-exports').hidden = !rig;
+      if (rig) {
+        $('fbx-download').href = job.files['rigged.fbx'];
+        $('blend-download').href = job.files['character.blend'];
+        $('static-download').href = `/outputs/${job.source_job}/object.glb`;
+      }
+      updateRigControls();
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 750));
@@ -221,6 +236,9 @@ $('form').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (busy) return;
   busy = true;
+  lastMeshJob = undefined;
+  $('rig-actions').hidden = true;
+  $('rig-exports').hidden = true;
   updateButton();
   const formData = new FormData($('form'));
   $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
@@ -255,6 +273,7 @@ $('form').addEventListener('submit', async (event) => {
     $('cancel').hidden = true;
     syncOutputControls();
     updateButton();
+    updateRigControls();
   }
 });
 
@@ -276,6 +295,7 @@ function applyStatus() {
   }
   syncOutputControls();
   updateButton();
+  updateRigControls();
 }
 
 async function checkStatus() {
@@ -300,4 +320,52 @@ $('cancel').addEventListener('click', async () => {
 });
 syncOutputControls();
 checkStatus();
-setInterval(() => { if (!busy && !serverReady) checkStatus(); }, 10000);
+setInterval(() => { if (!busy) checkStatus(); }, 10000);
+
+function updateRigControls() {
+  $('rig-actions').hidden = !lastMeshJob;
+  const ready = cachedStatus?.rig?.ready && cachedStatus?.rig?.weights_downloaded;
+  $('auto-rig').disabled = busy || !ready;
+  $('rig-note').textContent = ready ? 'Inspect the mesh first. Automatic rigging cannot repair missing or fused limbs.' : 'For automatic rigging, run make setup-rig rig-models.';
+}
+$('skeleton').addEventListener('change', () => meshViewer?.skeleton($('skeleton').checked));
+$('bend').addEventListener('change', () => meshViewer?.diagnostic($('bend').checked));
+$('auto-rig').addEventListener('click', async () => {
+  if (busy || !lastMeshJob) return;
+  busy = true;
+  configureStages(true);
+  updateRigControls();
+  updateButton();
+  $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
+  $('cancel').hidden = false;
+  $('cancel').disabled = true;
+  $('message').hidden = true;
+  $('download').hidden = true;
+  $('rig-exports').hidden = true;
+  $('empty').hidden = true;
+  $('busy').hidden = false;
+  generationStartedAt = Date.now();
+  showProgress({ stage: 'starting', message: 'Starting local automatic rigging…' });
+  const tick = setInterval(updateTiming, 1000);
+  try {
+    const job = await request(`/api/jobs/${lastMeshJob}/rig`, { method: 'POST' });
+    activeJobId = job.id;
+    $('cancel').disabled = false;
+    await disposeViewer();
+    await watchJob(job.id);
+  } catch (error) {
+    showError(error.message);
+    $('result-info').textContent = 'Rigging could not finish. The original mesh is preserved.';
+    if (!meshViewer) $('empty').hidden = false;
+  } finally {
+    clearInterval(tick);
+    busy = false;
+    activeJobId = undefined;
+    $('busy').hidden = true;
+    $('cancel').hidden = true;
+    $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = false; });
+    syncOutputControls();
+    updateButton();
+    updateRigControls();
+  }
+});

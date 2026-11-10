@@ -16,13 +16,18 @@ export async function loadMeshViewer(container, url) {
   const key = new THREE.DirectionalLight(0xffffff, 2.5);
   key.position.set(2, 3, 4);
   scene.add(key);
-  let object, frame, observer, disposed = false;
+  let object, frame, observer, skeleton, mixer, action, disposed = false;
+  const clock = new THREE.Clock();
   const initial = new THREE.Vector3();
   const dispose = () => {
     disposed = true;
     cancelAnimationFrame(frame);
     observer?.disconnect();
     controls.dispose();
+    mixer?.stopAllAction();
+    if (mixer && object) mixer.uncacheRoot(object);
+    skeleton?.geometry.dispose();
+    skeleton?.material.dispose();
     const geometries = new Set(), materials = new Set(), textures = new Set();
     object?.traverse((node) => {
       if (node.geometry) geometries.add(node.geometry);
@@ -48,6 +53,17 @@ export async function loadMeshViewer(container, url) {
     const center = box.getCenter(new THREE.Vector3());
     object.position.sub(center);
     scene.add(object);
+    if (object.getObjectByProperty('isSkinnedMesh', true)) {
+      skeleton = new THREE.SkeletonHelper(object);
+      skeleton.visible = false;
+      skeleton.material.depthTest = false;
+      skeleton.renderOrder = 10;
+      scene.add(skeleton);
+    }
+    if (gltf.animations.length) {
+      mixer = new THREE.AnimationMixer(object);
+      action = mixer.clipAction(gltf.animations.find((clip) => clip.name.includes('Diagnostic')) || gltf.animations[0]);
+    }
     const distance = Math.max(size.y, size.x / camera.aspect, size.z) / (2 * Math.tan(THREE.MathUtils.degToRad(20))) * 1.4;
     initial.set(distance * .65, distance * .25, distance);
     camera.position.copy(initial);
@@ -65,6 +81,7 @@ export async function loadMeshViewer(container, url) {
     observer.observe(container);
     const animate = () => {
       if (disposed) return;
+      mixer?.update(Math.min(clock.getDelta(), .1));
       controls.update();
       renderer.render(scene, camera);
       frame = requestAnimationFrame(animate);
@@ -72,6 +89,10 @@ export async function loadMeshViewer(container, url) {
     animate();
     return {
       dispose,
+      hasSkeleton: Boolean(skeleton),
+      hasAnimation: Boolean(action),
+      skeleton(enabled) { if (skeleton) skeleton.visible = enabled; },
+      diagnostic(enabled) { if (action) { if (enabled) action.reset().play(); else action.stop(); } },
       reset() { camera.position.copy(initial); controls.target.set(0, 0, 0); controls.update(); },
       wireframe(enabled) {
         object.traverse((node) => {
