@@ -27,3 +27,12 @@ The real UI completed the default photo upload → Idol → views → stereo →
 A clean pinned GS2Mesh source checkout plus the verified cached checkpoint passed setup at revision `02f2a66`; a disposable real-Git regression first reproduced and then prevented a fresh-clone checkout-state failure. The same regression confirms later local source edits are refused and preserved. Full local checks on that revision passed 51 API/logic tests, 30 infrastructure tests, nine Chromium fixture scenarios, lint, docs, build and committed-history security. Three native TripoSR regressions also passed.
 
 Inference/geometry acceptance above ran on `68c3f88`; subsequent changes affect setup, recent-result limit, progress wording and documentation. Runtime candidate `d6393e4` is used for the final model-switching and persisted-result acceptance. Private raw receipts retain tested revision, settings and per-stage measurements.
+
+
+The fresh-upload mesh independently measured **95.779% mean / 94.347% minimum** silhouette IoU against the same eight withheld cameras. Small differences in fused triangle count did not change this acceptance result.
+
+## Switching and persistence
+
+On runtime candidate `d6393e4`, normal Idol splat generation (10 steps / 65,536 Gaussians) completed in 36.5s and retained its cache. Starting the new isolated image-to-mesh path released that cache; cancellation during real image analysis stopped the child and released ownership. Legacy TripoSR then completed at grid 128 / 10,000-triangle budget / 512px texture in 12.5s with Idol still unloaded. Returning to normal splat generation completed in 32.0s and restored its cache. No concurrent model inference was used.
+
+Completed conversion, upload and rig jobs were re-read after restarting the idle test server. Existing source files and terminal metadata were preserved. The final PR records merge/CI evidence; these hardware measurements cover the unchanged inference path and do not substitute for broader game-quality review.
