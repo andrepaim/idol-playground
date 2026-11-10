@@ -402,7 +402,7 @@ function updateConversionControls() {
   $('conversion-actions').hidden = !lastSplatJob;
   const ready = cachedStatus?.splat_mesh?.ready && cachedStatus?.splat_mesh?.weights_downloaded;
   $('convert-mesh').disabled = busy || !ready;
-  $('conversion-note').textContent = ready ? 'Reuse this completed splat. Fine surface detail and the current parts setting are used.' : 'Set up conversion with make setup-splat-mesh splat-mesh-models.';
+  $('conversion-note').textContent = ready ? 'Reuse this completed splat. Conversion uses the surface and parts settings from the Idol mesh method.' : 'Set up conversion with make setup-splat-mesh splat-mesh-models.';
 }
 $('convert-mesh').addEventListener('click', async () => {
   if (busy || !lastSplatJob) return;

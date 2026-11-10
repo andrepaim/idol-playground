@@ -85,7 +85,7 @@ make doctor
 
 Bootstrap uses a separate `.venv-check` with CPU PyTorch and installs Chromium. The CUDA environment stays in `.venv`. Tests do not download model weights. CI checks code, frontend build, real Chromium acceptance with synthetic data, documentation, and committed-history security.
 
-See [getting started](docs/getting-started.md), [development](docs/development.md), [validation](docs/validation.md), and the [documentation index](docs/README.md). Follow [AGENTS.md](AGENTS.md) for issue ownership, planning, TDD, worktrees, risk-based checks, PR integration, and release authorization. The [mesh stage](docs/mesh-generation.md) is implemented; the broader [Game Character roadmap](docs/game-character-plan.md) includes subsequent rigging and animation work.
+See [getting started](docs/getting-started.md), [development](docs/development.md), [validation](docs/validation.md), and the [documentation index](docs/README.md). Follow [AGENTS.md](AGENTS.md) for issue ownership, planning, TDD, worktrees, risk-based checks, PR integration, and release authorization. The [mesh stage](docs/mesh-generation.md) is implemented; the broader [Game Character roadmap](docs/game-character-plan.md) includes experimental rigging and remaining engine/animation work.
 
 The tests cover upload validation, concurrent request rejection, generation failures, downloadable artifacts, public-model setup, saved job status, adaptive ETA timing, and guided/unguided sampling step counts. CPU substitutes do not validate model quality. Real-GPU validation is deliberate and uses the [hardware protocol](docs/validation.md#real-gpu-protocol).
 

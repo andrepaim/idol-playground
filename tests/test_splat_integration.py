@@ -206,3 +206,27 @@ def test_stereo_setup_checksum_failure_preserves_cached_data(monkeypatch,tmp_pat
     (tmp_path/'DLNR_Middlebury.pth').write_bytes(b'existing invalid file')
     with pytest.raises(RuntimeError,match='checksum'):setup.ensure_models()
     assert (tmp_path/'DLNR_Middlebury.pth').read_bytes()==b'existing invalid file'
+
+
+def test_first_install_checks_out_source_and_preserves_later_local_edits(monkeypatch,tmp_path):
+    import hashlib
+    import subprocess
+    import splat_mesh_setup as setup
+    upstream=tmp_path/'upstream';upstream.mkdir()
+    subprocess.run(['git','init','-q',str(upstream)],check=True)
+    module=upstream/'third_party/DLNR/core/dlnr.py';module.parent.mkdir(parents=True);module.write_text('# synthetic stereo source\n')
+    subprocess.run(['git','-C',str(upstream),'add','.'],check=True)
+    subprocess.run(['git','-C',str(upstream),'-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','-qm','fixture'],check=True)
+    revision=subprocess.check_output(['git','-C',str(upstream),'rev-parse','HEAD'],text=True).strip()
+    models=tmp_path/'models';models.mkdir();checkpoint=models/'DLNR_Middlebury.pth';checkpoint.write_bytes(b'synthetic fixture'*100)
+    monkeypatch.setattr(setup,'MODEL_ROOT',models);monkeypatch.setattr(setup,'SOURCE_REVISION',revision)
+    monkeypatch.setattr(setup,'CHECKPOINT_SHA256',hashlib.sha256(checkpoint.read_bytes()).hexdigest())
+    run=subprocess.run
+    def local_clone(command,**kwargs):
+        command=[str(upstream) if item=='https://github.com/yanivw12/gs2mesh.git' else item for item in command]
+        return run(command,**kwargs)
+    monkeypatch.setattr(setup.subprocess,'run',local_clone)
+    assert setup.ensure_models()==models and setup.models_ready()
+    local=models/'source/third_party/DLNR/core/dlnr.py';local.write_text('# owner local edit\n')
+    with pytest.raises(RuntimeError,match='local edits'):setup.ensure_models()
+    assert local.read_text()=='# owner local edit\n'

@@ -25,7 +25,7 @@ def ensure_models():
     MODEL_ROOT.mkdir(parents=True,exist_ok=True)
     source=MODEL_ROOT/'source';checkpoint=MODEL_ROOT/'DLNR_Middlebury.pth'
     if not source.exists():
-        subprocess.run(['git','clone','--no-checkout','https://github.com/yanivw12/gs2mesh.git',str(source)],check=True)
+        subprocess.run(['git','clone','https://github.com/yanivw12/gs2mesh.git',str(source)],check=True)
     if subprocess.check_output(['git','-C',str(source),'status','--porcelain','--untracked-files=no'],text=True).strip():
         raise RuntimeError('Stereo source has local edits; preserve them before rerunning setup.')
     subprocess.run(['git','-C',str(source),'fetch','origin',SOURCE_REVISION],check=True)
