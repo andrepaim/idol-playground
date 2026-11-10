@@ -90,3 +90,5 @@ The tests cover upload validation, concurrent request rejection, generation fail
 An additional real GPU check succeeded on this machine's RTX 3060: the official backpack example, synthetic mode, 10 steps, seed 42, and 262,144 Gaussians. With progress tracking, total request time including initial model loading was 38.6 seconds. All 10 sampling steps and all six server stages were recorded; ETA updates were observed through completion. The PLY was byte-identical to the baseline generated before progress instrumentation. The DINOv3 weight file's SHA-256 was independently checked against the mirror publisher's value above.
 
 For experimental skeleton prediction, skinning and GLB/FBX/Blender exports after mesh inspection, see [automatic rigging](docs/automatic-rigging.md). Install with `make setup-rig rig-models`.
+
+An optional [splat-derived mesh experiment](docs/splat-mesh-results.md) tests preserving the existing Idol result using rendered stereo views and surface fusion. It is separate from the current TripoSR mesh option.

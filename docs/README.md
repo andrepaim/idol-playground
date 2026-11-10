@@ -14,3 +14,5 @@
 [Bootstrap acceptance and effective settings](bootstrap-validation.md) records checks, hardware evidence, and access limitations.
 
 - [Experimental automatic rigging](automatic-rigging.md)
+
+- [Splat-derived mesh experiment](splat-mesh-results.md): local fidelity results and reproduction.
