@@ -1,0 +1,36 @@
+name: Investigation
+description: Plan an actionable investigation.
+labels:
+- type:investigation
+body:
+- type: textarea
+  id: behavior
+  attributes:
+    label: Behavior and scope
+    description: Describe the observed or intended user behavior, affected version/environment,
+      and boundaries.
+  validations:
+    required: true
+- type: textarea
+  id: acceptance
+  attributes:
+    label: Acceptance criteria
+    description: List concrete outcomes and relevant failure cases.
+  validations:
+    required: true
+- type: textarea
+  id: dependencies
+  attributes:
+    label: Dependencies and decisions
+    description: Identify blockers and authorization needed; an issue is not automatically
+      approved work.
+  validations:
+    required: false
+- type: textarea
+  id: validation
+  attributes:
+    label: Risk and validation
+    description: Describe required automated/browser/GPU checks and data-preservation
+      risks.
+  validations:
+    required: true
