@@ -26,6 +26,10 @@ Actual prediction produced 52 bones, approximately 3999/4261 MiB peak skeleton/s
 
 The unlit-material attempt failed FBX texture validation before normalization. Consequently this evidence covers the application's TripoSR PBR outputs and a prepared PBR humanoid; it does not establish arbitrary shader/material import compatibility. Raw benchmarks and their intermediate files were preserved locally.
 
+## Model switching
+
+The same API server completed Idol → rigging → Idol in 43.0s / 65.7s / 34.1s (Idol synthetic mode, 10 steps, 65,536 Gaussians, seed 42). Cached Idol status changed loaded → released → reloaded. Whole-GPU memory after those jobs was approximately 6796 → 3100 → 6796 MiB, including desktop/driver usage. The rig worker exited before the next generation; all jobs completed successfully. This is observed switching evidence, not a general performance guarantee.
+
 ## Automated validation and boundaries
 
 38 API/logic tests, 30 infrastructure tests, 6 Chromium browser cases, and 3 isolated TripoSR surface/export regressions passed, together with Ruff, ESLint, documentation/link checks, repository data guard and full-history secret scanning. Coverage includes invalid joint hierarchy/references, singular bind matrices, corrupt/unnormalized weights, missing setup/source, exclusive ownership, source preservation, persisted rig metadata, phase failures, ETA history and viewer controls/lifecycle.
