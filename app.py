@@ -1,6 +1,8 @@
 """Local web server. The model is loaded lazily, once, in a single worker."""
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
+import gc
 from importlib.util import find_spec
 from io import BytesIO
 import json
@@ -18,19 +20,31 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from model_setup import ensure_models, models_ready
 from progress import GenerationProgress, instrument_pipeline
+from mesh_setup import ensure_models as ensure_mesh_models, models_ready as mesh_models_ready
+from mesh_runtime import backend_installed as mesh_backend_installed, generate_mesh, MeshCancelled
+from mesh_progress import MeshProgress
 
 ROOT = Path(__file__).resolve().parent
 OUTPUTS = ROOT / "outputs"
 OUTPUTS.mkdir(exist_ok=True)
 MAX_UPLOAD = 20 * 1024 * 1024
 Image.MAX_IMAGE_PIXELS = 25_000_000
-app = FastAPI(title="Idol Playground")
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    for event in list(mesh_cancellations.values()):
+        event.set()
+    executor.shutdown(wait=True, cancel_futures=True)
+
+
+app = FastAPI(title="Idol Playground", lifespan=lifespan)
 executor = ThreadPoolExecutor(max_workers=1)
 lock = threading.Lock()
 jobs: dict[str, dict] = {}
 pipeline = None
 active_job = None
 job_progress = {}
+mesh_cancellations = {}
 
 
 @app.get("/api/status")
@@ -43,6 +57,8 @@ def status():
         "weights_downloaded": models_ready(),
         "model_loaded": pipeline is not None,
         "active_job": active_job,
+        "mesh": {"backend": "triposr", "ready": mesh_backend_installed(),
+                 "weights_downloaded": mesh_models_ready()},
     }
 
 
@@ -113,10 +129,62 @@ def generate(job_id: str, image_path: Path, settings: dict):
                 job_progress.pop(job_id, None)
 
 
+def release_idol():
+    """Release all cached Idol tensors before the separate mesh CUDA process starts."""
+    global pipeline
+    if pipeline is not None:
+        pipeline = None
+        gc.collect()
+        import torch
+        torch.cuda.empty_cache()
+
+
+def generate_mesh_job(job_id: str, image_path: Path, settings: dict):
+    global active_job
+    started = time.monotonic()
+    folder = image_path.parent
+    cancellation = mesh_cancellations[job_id]
+    try:
+        release_idol()
+        progress = MeshProgress(settings, lambda **values: update(job_id, **values), OUTPUTS / '.mesh-timings.json')
+        with lock:
+            job_progress[job_id] = progress
+        if not mesh_models_ready():
+            update(job_id, stage='download', message='Downloading mesh model files…', eta_seconds=None)
+            ensure_mesh_models()
+        if cancellation.is_set():
+            raise MeshCancelled('Mesh generation cancelled.')
+        details = generate_mesh(image_path, settings, progress.event, cancellation)
+        files = {name: f'/outputs/{job_id}/{name}' for name in
+                 ('object.glb', 'prepared.png', 'texture.png', 'source-mesh.glb', 'mesh.json', 'mesh-settings.json')
+                 if (folder / name).is_file()}
+        timing = progress.finish()
+        update(job_id, state='complete', stage='complete', eta_seconds=0, message='Your textured mesh is ready.',
+               files=files, mesh=details, seconds=round(time.monotonic() - started, 1), **timing)
+    except MeshCancelled as error:
+        update(job_id, state='cancelled', stage='cancelled', eta_seconds=None, message=str(error))
+    except Exception as error:
+        logging.exception('Mesh generation failed')
+        update(job_id, state='error', stage='error', eta_seconds=None, message=str(error)[:1500])
+    finally:
+        try:
+            (folder / 'job.json').write_text(json.dumps(jobs[job_id], indent=2))
+        except OSError:
+            logging.warning('Could not save mesh job metadata', exc_info=True)
+        with lock:
+            active_job = None
+            job_progress.pop(job_id, None)
+            mesh_cancellations.pop(job_id, None)
+
+
 @app.post("/api/generate", status_code=202)
 async def create_job(
     image: UploadFile = File(...),
     mode: Literal["real", "synthetic"] = Form("real"),
+    output_type: Literal["splat", "mesh"] = Form("splat"),
+    mesh_resolution: int = Form(192),
+    texture_resolution: int = Form(1024),
+    target_faces: int = Form(25000),
     steps: int = Form(50, ge=10, le=100),
     seed: int = Form(42, ge=0, le=2**31 - 1),
     num_gaussians: int = Form(262144),
@@ -126,7 +194,12 @@ async def create_job(
     global active_job
     if num_gaussians not in (65536, 131072, 262144, 524288, 1048576):
         raise HTTPException(422, "Choose a supported Gaussian count.")
-    if not status()["ready"]:
+    if output_type == 'mesh':
+        if mesh_resolution not in (128, 192, 256) or texture_resolution not in (512, 1024, 2048) or target_faces not in (10000, 25000, 50000, 100000):
+            raise HTTPException(422, 'Choose supported mesh, triangle and texture settings.')
+        if not status().get('mesh', {}).get('ready'):
+            raise HTTPException(503, 'Mesh setup is incomplete. Run make setup-mesh mesh-models. See README.md.')
+    elif not status()["ready"]:
         raise HTTPException(503, "Local setup is incomplete. Install the local model dependencies with uv sync --extra local. See README.md.")
     data = await image.read(MAX_UPLOAD + 1)
     await image.close()
@@ -144,6 +217,9 @@ async def create_job(
         raise HTTPException(422, "Upload a valid PNG, JPEG, or WebP image.") from None
     settings = dict(mode=mode, steps=steps, seed=seed, num_gaussians=num_gaussians,
                     cfg_strength=cfg_strength, rescale_t=rescale_t)
+    if output_type == 'mesh':
+        settings = dict(mesh_resolution=mesh_resolution, texture_resolution=texture_resolution,
+                        target_faces=target_faces, seed=seed)
     job_id = uuid4().hex
     folder = OUTPUTS / job_id
     with lock:
@@ -152,13 +228,16 @@ async def create_job(
         folder.mkdir()
         prepared.save(folder / "input.png")
         jobs[job_id] = {"id": job_id, "state": "running", "stage": "starting", "eta_seconds": None,
-                        "started_at": time.time(), "message": "Starting…", "settings": settings}
+                        "started_at": time.time(), "message": "Starting…", "settings": settings, "output_type": output_type}
         active_job = job_id
         try:
-            executor.submit(generate, job_id, folder / "input.png", settings)
+            if output_type == 'mesh':
+                mesh_cancellations[job_id] = threading.Event()
+            executor.submit(generate_mesh_job if output_type == 'mesh' else generate, job_id, folder / "input.png", settings)
         except Exception:
             active_job = None
             jobs.pop(job_id, None)
+            mesh_cancellations.pop(job_id, None)
             raise
     return {"id": job_id}
 
@@ -179,6 +258,21 @@ def get_job(job_id: str):
             if job_id in job_progress:
                 job.update(job_progress[job_id].snapshot())
         return job
+
+
+@app.post('/api/jobs/{job_id}/cancel', status_code=202)
+def cancel_mesh(job_id: str):
+    with lock:
+        if job_id not in jobs:
+            raise HTTPException(404, 'Generation not found.')
+        if jobs[job_id]['state'] != 'running':
+            raise HTTPException(409, 'This generation is no longer running.')
+        event = mesh_cancellations.get(job_id)
+        if event is None:
+            raise HTTPException(409, 'Cancellation is available for mesh generation only.')
+        event.set()
+        jobs[job_id]['message'] = 'Stopping the mesh worker…'
+    return {'id': job_id, 'state': 'cancelling'}
 
 
 app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")

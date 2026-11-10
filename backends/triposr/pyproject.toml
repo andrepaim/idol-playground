@@ -1,0 +1,19 @@
+[project]
+name = "idol-triposr-backend"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "torch==2.5.1", "numpy==1.26.4", "Pillow==10.1.0", "omegaconf==2.3.0",
+  "einops==0.7.0", "transformers==4.35.0", "trimesh==4.5.3", "rembg==2.0.57",
+  "onnxruntime==1.19.2", "huggingface-hub==0.17.3", "imageio==2.36.0",
+  "xatlas==0.0.9", "moderngl==5.10.0", "PyMCubes==0.1.6", "fast-simplification==0.1.7",
+]
+[tool.uv]
+package = false
+required-version = "==0.12.3"
+[tool.uv.sources]
+torch = {index = "pytorch-cu124"}
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true

@@ -1,6 +1,6 @@
 # Idol Playground
 
-A small web app for [Speridlabs Idol](https://huggingface.co/speridlabs/idol): upload an image, generate a 3D Gaussian splat, orbit it in your browser, and download the standard `.ply` file.
+A local image-to-3D web app: generate a Gaussian splat (`.ply`) with [Idol](https://huggingface.co/speridlabs/idol), or a textured polygon mesh (`.glb`) with [TripoSR](https://github.com/VAST-AI-Research/TripoSR). Preview the result in your browser and download it.
 
 ## See it in action
 
@@ -31,9 +31,23 @@ uv run --no-sync python model_setup.py
 
 Open **http://127.0.0.1:8000**. If you skip the explicit download command, the first generation downloads the missing files automatically. Once downloaded, the app loads all model components from local directories.
 
-Weights and encoders total about 5 GB. Model loading takes longer than subsequent requests. The pipeline stays in memory, and requests run one at a time. CUDA must be available to PyTorch; the app does not fall back to slow CPU inference. This uses the upstream SDK pinned to commit `8db700349a5570aac390e4780fa32e3eed6b587a`.
+Weights and encoders total about 5 GB. Model loading takes longer than subsequent requests. Idol stays in memory between splat requests and unloads before mesh generation. Requests run one at a time. CUDA must be available to PyTorch; the app does not fall back to slow CPU inference. This uses the upstream SDK pinned to commit `8db700349a5570aac390e4780fa32e3eed6b587a`.
 
-## Model sources
+## Textured meshes
+
+Add the mesh backend to an existing installation:
+
+```sh
+make setup-mesh mesh-models
+npm run build
+./run.sh
+```
+
+Choose **Textured mesh · .glb** after uploading a photo. Set a triangle budget and texture size, then inspect the result with orbit, wireframe, and reset controls. The GLB embeds its texture. Mesh jobs report progress/ETA and can be cancelled.
+
+The mesh backend has its own pinned Python/CUDA environment. Starting it releases cached Idol tensors, and the worker exits after each job. Meshes are currently unrigged prototypes; inspect anatomy before animation. See [mesh setup, settings, limitations and validation](docs/mesh-generation.md), including a mesh-only setup path.
+
+## Idol model sources
 
 `model_setup.py` pins and downloads only the necessary files into the ignored `models/` directory:
 
@@ -69,7 +83,7 @@ make doctor
 
 Bootstrap uses a separate `.venv-check` with CPU PyTorch and installs Chromium. The CUDA environment stays in `.venv`. Tests do not download model weights. CI checks code, frontend build, real Chromium acceptance with synthetic data, documentation, and committed-history security.
 
-See [getting started](docs/getting-started.md), [development](docs/development.md), [validation](docs/validation.md), and the [documentation index](docs/README.md). Follow [AGENTS.md](AGENTS.md) for issue ownership, planning, TDD, worktrees, risk-based checks, PR integration, and release authorization. The [Game Character workflow](docs/game-character-plan.md) is planned, not implemented.
+See [getting started](docs/getting-started.md), [development](docs/development.md), [validation](docs/validation.md), and the [documentation index](docs/README.md). Follow [AGENTS.md](AGENTS.md) for issue ownership, planning, TDD, worktrees, risk-based checks, PR integration, and release authorization. The [mesh stage](docs/mesh-generation.md) is implemented; the broader [Game Character roadmap](docs/game-character-plan.md) includes subsequent rigging and animation work.
 
 The tests cover upload validation, concurrent request rejection, generation failures, downloadable artifacts, public-model setup, saved job status, adaptive ETA timing, and guided/unguided sampling step counts. CPU substitutes do not validate model quality. Real-GPU validation is deliberate and uses the [hardware protocol](docs/validation.md#real-gpu-protocol).
 
