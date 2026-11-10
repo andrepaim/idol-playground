@@ -51,3 +51,8 @@ setup-splat-mesh:
 	./scripts/setup-splat-mesh.sh
 splat-mesh-models:
 	$(if $(wildcard $(LOCAL_PYTHON)),$(LOCAL_PYTHON),$(CHECK_PYTHON)) splat_mesh_setup.py
+
+.PHONY: test-walking-native
+test-walking-native:
+	PYTHONPATH=. .venv-unirig/bin/python experiments/walking/test_pose_native.py
+	PYTHONPATH=. .venv-unirig/bin/python experiments/walking/test_skin_native.py
