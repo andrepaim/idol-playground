@@ -78,6 +78,16 @@ def update(job_id: str, **values):
         jobs[job_id].update(values)
 
 
+def gpu():
+    """The torch device module for the best accelerator: CUDA, else Apple Silicon MPS."""
+    import torch
+    if torch.cuda.is_available():
+        return "cuda", torch.cuda
+    if torch.backends.mps.is_available():
+        return "mps", torch.mps
+    return None, None
+
+
 def generate(job_id: str, image_path: Path, settings: dict):
     global pipeline, active_job
     started = time.monotonic()
@@ -89,21 +99,21 @@ def generate(job_id: str, image_path: Path, settings: dict):
         )
         with lock:
             job_progress[job_id] = progress
-        import torch
         from idol import IdolPipeline
 
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is unavailable. Install a CUDA-enabled PyTorch build and check nvidia-smi.")
+        device, accel = gpu()
+        if device is None:
+            raise RuntimeError("No GPU available. Use an NVIDIA CUDA GPU or an Apple Silicon Mac (MPS).")
         if pipeline is None:
             if not models_ready():
                 progress.start("download", "Downloading model files. ETA will be available once the download finishes…")
             weights, encoders = ensure_models()
             progress.start("load")
             pipeline = IdolPipeline.from_pretrained(
-                weights, device="cuda", image_encoders=encoders,
+                weights, device=device, image_encoders=encoders,
                 optimize=os.environ.get("IDOL_OPTIMIZE", "0") == "1",
             )
-        with instrument_pipeline(pipeline, progress, torch.cuda.synchronize):
+        with instrument_pipeline(pipeline, progress, accel.synchronize):
             output = pipeline(str(image_path), **settings)
         progress.start("save")
         output.gaussian.save_ply(str(folder / "object.ply"))
@@ -130,8 +140,9 @@ def generate(job_id: str, image_path: Path, settings: dict):
         update(job_id, state="error", stage="error", eta_seconds=None, message=message[:1500])
     finally:
         try:
-            import torch
-            torch.cuda.empty_cache()
+            _, accel = gpu()
+            if accel is not None:
+                accel.empty_cache()
         except Exception:
             logging.debug("GPU cleanup unavailable", exc_info=True)
         finally:

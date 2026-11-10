@@ -26,3 +26,16 @@ The smoke script refuses missing model setup, creates a synthetic image, runs 10
 The receipt includes commit/dirty state, device, driver, CUDA/PyTorch versions, model revisions, settings, stage times, and measured PyTorch peak allocated memory. Allocated memory is not total device usage. Add manual visual observations separately when required. Restart the user's app after releasing the smoke process.
 
 Failed or unavailable required GPU acceptance is a blocker; leave affected work unmerged. A passing CPU CI run does not waive it. Inspect future rigging/export behavior with the additional checks in the [feature plan](game-character-plan.md).
+
+## Apple Silicon splats
+
+Splat generation also runs on Apple Silicon through PyTorch MPS: the app picks CUDA, else MPS, and the SDK samples eagerly there (`IDOL_OPTIMIZE` has no effect). `make doctor` reports `mps`. `make test-gpu` remains CUDA-only. Polygon meshes, stereo conversion and rigging require CUDA.
+
+Recorded on an Apple M5 Max (128 GB unified memory), macOS, PyTorch 2.15.0, the pinned SDK and models, served by `./run.sh`:
+
+| Input | Settings | Total | Sampling |
+|---|---|---:|---:|
+| SDK example `obj-backpack.webp`, cold start | synthetic, 10 steps, 262,144 Gaussians, seed 42 | 36.0 s | 14.8 s |
+| SDK example `fig-fox.webp`, warm | synthetic, defaults (50 steps, 262,144 Gaussians) | 72.0 s | 70.3 s |
+
+Both completed with all sampling steps counted and wrote a PLY, prepared image and camera that the app reopened from saved results. The preview was not visually inspected, and reconstruction quality was not compared with CUDA output.

@@ -130,6 +130,58 @@ def test_model_error_releases_gpu_slot(client, monkeypatch):
     assert server.active_job is None
 
 
+def fake_torch(cuda, mps, calls):
+    def accelerator(name, available):
+        return types.SimpleNamespace(is_available=lambda: available, empty_cache=lambda: calls.append(f"{name} release"),
+                                     synchronize=lambda: calls.append(f"{name} sync"))
+    return types.SimpleNamespace(cuda=accelerator("cuda", cuda), mps=accelerator("mps", mps),
+                                 backends=types.SimpleNamespace(mps=types.SimpleNamespace(is_available=lambda: mps)))
+
+
+def test_generation_uses_apple_silicon_gpu_without_cuda(client, monkeypatch):
+    import sys
+
+    calls, loaded = [], {}
+
+    class Gaussian:
+        def save_ply(self, path):
+            from pathlib import Path
+            Path(path).write_bytes(b"ply\nformat ascii 1.0\nend_header\n")
+
+    class IdolPipeline:
+        @classmethod
+        def from_pretrained(cls, weights, device, **kwargs):
+            loaded["device"] = device
+            return lambda image, **settings: types.SimpleNamespace(
+                gaussian=Gaussian(), preprocessed_image=Image.open(image), camera={"yaw": 0})
+
+    def instrument(pipeline, progress, synchronize):
+        synchronize()
+        return nullcontext()
+
+    monkeypatch.setattr(server, "pipeline", None)
+    monkeypatch.setattr(server, "models_ready", lambda: True)
+    monkeypatch.setattr(server, "ensure_models", lambda: ("weights", {}))
+    monkeypatch.setattr(server, "instrument_pipeline", instrument)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch(cuda=False, mps=True, calls=calls))
+    monkeypatch.setitem(sys.modules, "idol", types.SimpleNamespace(IdolPipeline=IdolPipeline))
+    job = wait_for_job(client, submit(client).json()["id"])
+    assert job["state"] == "complete", job
+    assert loaded["device"] == "mps"
+    assert calls == ["mps sync", "mps release"]
+
+
+def test_generation_without_any_gpu_is_actionable(client, monkeypatch):
+    import sys
+
+    monkeypatch.setattr(server, "pipeline", None)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch(cuda=False, mps=False, calls=[]))
+    monkeypatch.setitem(sys.modules, "idol", types.SimpleNamespace(IdolPipeline=object))
+    job = wait_for_job(client, submit(client).json()["id"])
+    assert job["state"] == "error"
+    assert "Apple Silicon" in job["message"]
+
+
 def test_unknown_job_returns_404(client):
     assert client.get("/api/jobs/missing").status_code == 404
 

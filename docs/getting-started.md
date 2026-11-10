@@ -1,6 +1,6 @@
 # Getting started
 
-Use Linux, Python 3.11, Node 22.23.1, uv 0.12.3, Git, and Make. GPU generation requires an NVIDIA CUDA GPU; the local acceptance target is an RTX 3060 with 12 GB VRAM. Other platforms are not yet accepted targets.
+Use Linux, Python 3.11, Node 22.23.1, uv 0.12.3, Git, and Make. GPU generation requires an NVIDIA CUDA GPU, or an Apple Silicon Mac for splats only (see [Apple Silicon](validation.md#apple-silicon-splats)); the local acceptance target is an RTX 3060 with 12 GB VRAM. Other platforms are not yet accepted targets.
 
 ```sh
 git clone https://github.com/andrepaim/idol-playground.git
@@ -22,7 +22,7 @@ make run
 
 Open http://127.0.0.1:8000. `make setup-local` installs the CUDA SDK into `.venv` from `uv.lock`. `make models` downloads about 5 GB of pinned public assets; no Hugging Face login is required. The first generation can download missing weights if explicit setup was skipped. Internet access is needed during setup; cached inference loads local files.
 
-`make doctor` selects `.venv` if present, otherwise `.venv-check`, and reports missing dependencies/models. `.venv/bin/python scripts/doctor.py --require-gpu` fails when full generation readiness is absent. Check `nvidia-smi` and CUDA-enabled PyTorch if generation is unavailable. Close other GPU applications or use fewer Gaussians for memory pressure.
+`make doctor` selects `.venv` if present, otherwise `.venv-check`, and reports missing dependencies/models. `.venv/bin/python scripts/doctor.py --require-gpu` fails when full generation readiness is absent. Check `nvidia-smi` and CUDA-enabled PyTorch if generation is unavailable; on a Mac, `doctor` reports `mps`. Close other GPU applications or use fewer Gaussians for memory pressure.
 
 The app binds to loopback. `PORT=8002 make run` selects another port. Export variables in your shell; `.env.example` is documentation and the server does not automatically load `.env`.
 
