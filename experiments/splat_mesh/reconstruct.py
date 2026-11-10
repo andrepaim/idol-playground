@@ -82,6 +82,7 @@ def main():
     parser.add_argument('--limit',type=int,default=0)
     parser.add_argument('--iters',type=int,default=10)
     parser.add_argument('--voxel',type=float,default=.004)
+    parser.add_argument('--status-url',default='http://127.0.0.1:8000/api/status',help='Pause CUDA work while an owner app job is active')
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
     import open3d as o3d
     started=time.monotonic()
@@ -99,6 +100,13 @@ def main():
                                                       color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)
     pairs=manifest['pairs'][:args.limit or None]
     for index,pair in enumerate(pairs):
+        if model and args.status_url:
+            import urllib.request
+            while True:
+                with urllib.request.urlopen(args.status_url,timeout=10) as response:state=json.load(response)
+                if state.get('active_job') is None:break
+                print('Waiting for the active app generation before stereo inference…',flush=True)
+                time.sleep(5)
         tick=time.monotonic();left,alpha=load_view(args.views/pair['left']['file']);right,_=load_view(args.views/pair['right']['file'])
         cache=args.output/f'{index:03}-disparity.npz'
         if cache.is_file():
