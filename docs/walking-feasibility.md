@@ -12,6 +12,8 @@ Trials corrected the reference Y-up/target Z-up conversion, aligned horizontal a
 
 The candidate was exported as a constant two-frame clip and inspected in Chromium/Three.js with software WebGL. Playback matters: a static glTF rest-pose display showed the original seated dog and would have concealed the failed candidate. Visible belly/rear-leg distortion and incomplete grounded support reject this pose as the basis for a natural-walking claim. Screenshots, mappings, logs and raw measurements remain local.
 
+Two additional disposable trials did not resolve this gate: 20 adjacency-smoothing iterations followed by four-influence normalization produced 5.07% of edges stretched beyond twice their baseline (95th percentile 2.02); Blender volume-preserving skinning evaluation produced a 95th percentile of 2.00 and 47,185 edges above twice baseline. The latter was evaluated locally only; no claim is made that glTF reproduces that skinning mode. These are limited diagnostic attempts, not an exhaustive rig-repair search.
+
 These trials do not prove the rig is impossible to correct, nor isolate skin weights from all residual joint-placement/mapping errors. They do establish that the tested pose-transfer approaches fail the current visual gate. No paw IK, natural loop, game-engine compatibility or walking export acceptance is claimed.
 
 ## Next dependency
