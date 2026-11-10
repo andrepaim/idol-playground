@@ -12,3 +12,5 @@
 - [Agent policy draft](agents-policy-draft.md): historical source for the active [root policy](../AGENTS.md).
 
 [Bootstrap acceptance and effective settings](bootstrap-validation.md) records checks, hardware evidence, and access limitations.
+
+- [Experimental automatic rigging](automatic-rigging.md)

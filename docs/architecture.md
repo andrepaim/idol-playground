@@ -20,3 +20,5 @@ Jobs store input, PLY, prepared image, camera, settings, and completed metadata 
 The server has no authentication and binds to `127.0.0.1`. It is intended for personal local use. Public GitHub source does not publish the app or its artifacts.
 
 TripoSR workers, mesh cancellation, textured GLB export, and mesh preview are implemented. Idol still uses its existing in-process cache. Skeleton prediction, skinning, animation, and FBX export remain subsequent [Game Character work](game-character-plan.md).
+
+Optional automatic rigging uses a third pinned environment and sequential bounded UniRig/Blender phase processes. Both skeleton and skin models run locally with offline assets; exports retain source UVs/materials and are reimported for binding/texture checks. A separate rig job preserves its completed static source job and shares GPU ownership, cancellation and persisted status with mesh generation.

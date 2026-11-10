@@ -1,6 +1,6 @@
 # Textured mesh generation
 
-Choose **Textured mesh · .glb** in the app to reconstruct a polygon mesh directly from the uploaded photo. This uses TripoSR and produces a different reconstruction from Idol's Gaussian splat. The exported mesh has UV coordinates and an embedded color texture; automatic rigging is a subsequent stage.
+Choose **Textured mesh · .glb** in the app to reconstruct a polygon mesh directly from the uploaded photo. This uses TripoSR and produces a different reconstruction from Idol's Gaussian splat. The exported mesh has UV coordinates and an embedded color texture; optional [experimental automatic rigging](automatic-rigging.md) follows mesh inspection.
 
 ## Setup and use
 

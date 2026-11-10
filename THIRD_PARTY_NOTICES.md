@@ -9,3 +9,5 @@ This repository contains application source and dependency/model references. It 
 - Validation routing, Markdown link checking, and repository guard patterns were adapted from the owner's DistillPod project at the owner's request.
 
 Model cards and available notices are retained by the downloader. Review upstream terms when changing pinned revisions or distributing assets. The optional mesh backend installs pinned TripoSR code/weights, DINO configuration, U2Net/rembg, PyMCubes, xatlas, trimesh, and fast-simplification. Preserve their respective upstream licenses; TripoSR source/model use MIT terms and PyMCubes uses BSD terms. UniRig integration is subsequent work.
+
+Automatic rigging optionally downloads pinned [UniRig](https://github.com/VAST-AI-Research/UniRig) code and [weights](https://huggingface.co/VAST-AI/UniRig) (MIT notices retained beside local assets), plus the OPT architecture configuration. Its isolated environment includes Blender/bpy (GPL) and official prebuilt CUDA extensions; dependency licenses remain applicable. No checkpoints or third-party binaries are vendored in this repository. See `backends/unirig/uv.lock` and `docs/automatic-rigging.md`.

@@ -39,3 +39,9 @@ mesh-models:
 	$(if $(wildcard $(LOCAL_PYTHON)),$(LOCAL_PYTHON),$(CHECK_PYTHON)) mesh_setup.py
 test-mesh-backend:
 	.venv-triposr/bin/python -m unittest discover -s backends/triposr -p 'test_*.py'
+
+.PHONY: setup-rig rig-models
+setup-rig:
+	./scripts/setup-rig.sh
+rig-models:
+	$(if $(wildcard $(LOCAL_PYTHON)),$(LOCAL_PYTHON),$(CHECK_PYTHON)) rig_setup.py

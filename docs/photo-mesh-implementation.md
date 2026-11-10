@@ -1,6 +1,6 @@
 # Photo-to-mesh implementation
 
-Status: static mesh increment implemented and validated locally; PR #17 awaits CI and merge. See [validation evidence](mesh-validation.md). Parent: issue #2. The existing Game Character plan remains the longer-term rigging/export roadmap.
+Status: static mesh increment merged in PR #17 with successful combined-main CI. See [validation evidence](mesh-validation.md). Parent: issue #2. The existing Game Character plan remains the longer-term rigging/export roadmap.
 
 ## Behavior and acceptance
 

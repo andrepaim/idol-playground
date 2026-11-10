@@ -23,6 +23,8 @@ from progress import GenerationProgress, instrument_pipeline
 from mesh_setup import ensure_models as ensure_mesh_models, models_ready as mesh_models_ready
 from mesh_runtime import backend_installed as mesh_backend_installed, generate_mesh, MeshCancelled
 from mesh_progress import MeshProgress
+from rig_runtime import backend_installed as rig_backend_installed, generate_rig, PHASES as RIG_PHASES
+from rig_setup import models_ready as rig_models_ready
 
 ROOT = Path(__file__).resolve().parent
 OUTPUTS = ROOT / "outputs"
@@ -51,6 +53,7 @@ mesh_cancellations = {}
 def status():
     installed = find_spec("idol") is not None
     return {
+        "rig": {"ready": rig_backend_installed(), "weights_downloaded": rig_models_ready()},
         "backend": "local",
         "model_installed": installed,
         "ready": installed,
@@ -177,6 +180,73 @@ def generate_mesh_job(job_id: str, image_path: Path, settings: dict):
             mesh_cancellations.pop(job_id, None)
 
 
+def generate_rig_job(job_id: str, source: Path, seed: int):
+    global active_job
+    folder = OUTPUTS / job_id
+    started = time.monotonic()
+    try:
+        release_idol()
+        progress = MeshProgress({}, lambda **values: update(job_id, **values), OUTPUTS / '.rig-timings.json',
+                                stages=RIG_PHASES, baseline=dict(zip(RIG_PHASES, (4,30,4,30,8,8))), scales={})
+        with lock:
+            job_progress[job_id] = progress
+        details = generate_rig(source, folder, seed, progress.event, mesh_cancellations[job_id])
+        files = {name: f'/outputs/{job_id}/{name}' for name in
+                 ('rigged.glb','rigged.fbx','character.blend','rig.json') if (folder/name).is_file()}
+        timing = progress.finish()
+        update(job_id, state='complete', stage='complete', eta_seconds=0,
+               message='Your experimental rig is ready. Inspect the skeleton and bend before game use.',
+               rig=details, files=files, seconds=round(time.monotonic()-started,1), **timing)
+    except MeshCancelled:
+        update(job_id,state='cancelled',stage='cancelled',eta_seconds=None,message='Automatic rigging cancelled. The static mesh is preserved.')
+    except Exception as error:
+        logging.exception('Automatic rigging failed')
+        update(job_id,state='error',stage='error',eta_seconds=None,message=str(error)[:1500])
+    finally:
+        try:
+            (folder/'job.json').write_text(json.dumps(jobs[job_id],indent=2))
+        except OSError:
+            logging.warning('Could not save rig metadata',exc_info=True)
+        with lock:
+            active_job = None
+            job_progress.pop(job_id,None)
+            mesh_cancellations.pop(job_id,None)
+
+
+@app.post('/api/jobs/{source_id}/rig', status_code=202)
+def create_rig(source_id: str):
+    global active_job
+    if len(source_id) != 32 or any(c not in '0123456789abcdef' for c in source_id):
+        raise HTTPException(404,'Mesh generation not found.')
+    source_job = get_job(source_id)
+    source = OUTPUTS/source_id/'object.glb'
+    if source_job.get('output_type') != 'mesh' or source_job['state'] != 'complete' or not source.is_file():
+        raise HTTPException(409,'Complete a textured mesh generation before automatic rigging.')
+    if not rig_backend_installed() or not rig_models_ready():
+        raise HTTPException(503,'Rigging setup is incomplete. Run make setup-rig rig-models.')
+    seed = source_job.get('settings',{}).get('seed',42)
+    if not isinstance(seed,int) or not 0 <= seed <= 2**31-1:
+        raise HTTPException(422,'Invalid source seed.')
+    job_id = uuid4().hex
+    with lock:
+        if active_job:
+            raise HTTPException(409,'A generation is already running. Wait for it to finish.')
+        (OUTPUTS/job_id).mkdir()
+        jobs[job_id] = {'id':job_id,'state':'running','stage':'starting','eta_seconds':None,
+                        'started_at':time.time(),'message':'Starting automatic rigging…','settings':{'seed':seed},
+                        'output_type':'rig','source_job':source_id}
+        mesh_cancellations[job_id] = threading.Event()
+        active_job = job_id
+        try:
+            executor.submit(generate_rig_job,job_id,source,seed)
+        except Exception:
+            active_job = None
+            mesh_cancellations.pop(job_id,None)
+            jobs.pop(job_id,None)
+            raise
+    return {'id':job_id}
+
+
 @app.post("/api/generate", status_code=202)
 async def create_job(
     image: UploadFile = File(...),
@@ -269,9 +339,9 @@ def cancel_mesh(job_id: str):
             raise HTTPException(409, 'This generation is no longer running.')
         event = mesh_cancellations.get(job_id)
         if event is None:
-            raise HTTPException(409, 'Cancellation is available for mesh generation only.')
+            raise HTTPException(409, 'Cancellation is available for mesh and rigging jobs only.')
         event.set()
-        jobs[job_id]['message'] = 'Stopping the mesh worker…'
+        jobs[job_id]['message'] = 'Stopping the generation worker…'
     return {'id': job_id, 'state': 'cancelling'}
 
 
