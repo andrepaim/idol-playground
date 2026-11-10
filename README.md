@@ -1,0 +1,65 @@
+# Idol Playground
+
+A small web app for [Speridlabs Idol](https://huggingface.co/speridlabs/idol): upload an image, generate a 3D Gaussian splat, orbit it in your browser, and download the standard `.ply` file.
+
+## Run locally
+
+Requires Python 3.11–3.13, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ (or 22.12+), and an NVIDIA CUDA GPU. The model card reports approximately 7.2 GB peak VRAM at default settings. This machine's RTX 3060 has 12 GB; other GPU applications also consume VRAM.
+
+```bash
+cd /home/andrepaim/src/idol-playground
+uv sync --extra local
+npm ci
+npm run build
+```
+
+Download the model files and start the app. No Hugging Face account or login is required:
+
+```bash
+uv run --no-sync python model_setup.py
+./run.sh
+```
+
+Open **http://127.0.0.1:8000**. If you skip the explicit download command, the first generation downloads the missing files automatically. Once downloaded, the app loads all model components from local directories.
+
+Weights and encoders total about 5 GB. Model loading takes longer than subsequent requests. The pipeline stays in memory, and requests run one at a time. CUDA must be available to PyTorch; the app does not fall back to slow CPU inference. This uses the upstream SDK pinned to commit `8db700349a5570aac390e4780fa32e3eed6b587a`.
+
+## Model sources
+
+`model_setup.py` pins and downloads only the necessary files into the ignored `models/` directory:
+
+| Component | Public source | Pinned revision |
+| --- | --- | --- |
+| Idol + background remover | [speridlabs/idol](https://huggingface.co/speridlabs/idol) | `2731c2291fc65a797c5cb627a5e5526fc1490902` |
+| DINOv3 ViT-H+/16 | [LibreYOLO/LibreDINOv3vith16plus](https://huggingface.co/LibreYOLO/LibreDINOv3vith16plus) | `e849a3492905c6dabc89758042bf1402770fb4e6` |
+| FLUX.2 VAE only | [black-forest-labs/FLUX.2-klein-4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) | `e7b7dc27f91deacad38e78976d1f2b499d76a294` |
+
+The DINOv3 source is a community mirror of Meta's encoder, stored in bfloat16, the precision Idol uses. Its publisher reports identical bfloat16 tensors and outputs to the upstream checkpoint; that equivalence has not been independently compared against the gated original here. The original DINOv3 license and attribution are retained in `models/dinov3/LICENSE` and `NOTICE`. Expected mirror weight SHA-256: `34252ee11eeebf00d50c528d53d725672f03ad88ff30cb724ddf3920bf67dc4c`.
+
+The VAE comes from Black Forest Labs' public Apache-2.0 Klein release. The [Idol SDK documents](https://github.com/speridlabs/idol-sdk#python-api) using a compatible FLUX.2 autoencoder from Klein through `image_encoders`. This downloads the VAE, not the full Klein image-generation model. Model cards and available license files are kept with each download.
+
+## Usage and files
+
+- Use **Real photograph** for photos, or **Render / AI-generated image** for synthetic inputs. A single object works best.
+- The default is 50 steps, 262,144 Gaussians, guidance 3, time shift 3, and seed 42. For a quicker first test, try 10 steps and 65,536 Gaussians.
+- Generation reports loading, background removal, image analysis, live sampling steps, Gaussian decoding, saving, and preview preparation. The ETA starts as a rough estimate and updates using completed GPU steps; successful runs calibrate stage estimates in `outputs/.timings.json`. Download time and browser preview time do not have a GPU-based ETA.
+- Drag the preview to orbit, use the wheel to zoom, and right-drag to pan. Preview requires WebGL2; a PLY download remains available if preview fails.
+- Uploads accept PNG, JPEG, or WebP, up to 20 MB / 25 megapixels. EXIF orientation is corrected and oversized inputs are scaled to a maximum side of 2048 pixels before inference.
+- Inputs and results are saved in `outputs/<job-id>/`. Delete folders there to reclaim space when the app is idle. Completed job metadata is saved in `job.json` so its status can be read after a restart. An interrupted generation cannot be resumed.
+- Binding to `127.0.0.1` keeps the app local. It has no accounts and is intended for personal use.
+
+Optimization with `torch.compile` is off by default to avoid a long compilation on the first trial and reduce GPU memory pressure. Set `IDOL_OPTIMIZE=1 ./run.sh` to enable the SDK's optimized sampling path.
+
+## Development and checks
+
+```bash
+uv sync --extra local --extra dev
+uv run --no-sync pytest -q
+npm run build
+```
+
+For frontend hot reload, run `uv run --no-sync uvicorn app:app --host 127.0.0.1 --port 8000` and `npm run dev` in separate terminals, then open the Vite URL. API requests are proxied to port 8000.
+
+The tests cover upload validation, concurrent request rejection, generation failures, downloadable artifacts, setup without a login, saved job status, adaptive ETA timing, and correct sampling step counts for guided and unguided inference. Tests use a model substitute and small PyTorch modules; they do not download weights or claim to validate model quality.
+
+An additional real GPU check succeeded on this machine's RTX 3060: the official backpack example, synthetic mode, 10 steps, seed 42, and 262,144 Gaussians. With progress tracking, total request time including initial model loading was 38.6 seconds. All 10 sampling steps and all six server stages were recorded; ETA updates were observed through completion. The PLY was byte-identical to the baseline generated before progress instrumentation. The DINOv3 weight file's SHA-256 was independently checked against the mirror publisher's value above.

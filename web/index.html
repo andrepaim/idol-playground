@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101512" />
+    <title>Idol · Image to 3D</title>
+  </head>
+  <body>
+    <main>
+      <header><a class="wordmark" href="/">idol<span class="dot">●</span></a><span class="eyebrow">IMAGE → 3D PLAYGROUND</span><a class="source" href="https://huggingface.co/speridlabs/idol" target="_blank" rel="noreferrer">Model ↗</a></header>
+      <section class="intro"><span class="tag">SPERIDLABS / IDOL</span><h1>A new dimension.<br><span>From a single image.</span></h1><p>Upload an object. Let Idol imagine the other sides.</p></section>
+      <div id="setup" class="notice" hidden></div>
+      <section class="workspace">
+        <form id="form" class="panel input-panel">
+          <div class="panel-heading"><span><b>01</b> Your image</span><span class="small">PNG · JPG · WEBP</span></div>
+          <label id="dropzone" class="dropzone" tabindex="0" for="image"><input type="file" id="image" name="image" accept="image/png,image/jpeg,image/webp" required /><div id="upload-prompt"><div class="upload-icon">↥</div><strong>Drop an image here</strong><span>or click to browse · up to 20 MB</span></div><img id="image-preview" alt="Your uploaded object" hidden /><span id="replace" hidden>Click to replace</span></label>
+          <div class="field"><label for="mode">Image type</label><select id="mode" name="mode"><option value="real">Real photograph</option><option value="synthetic">Render / AI-generated image</option></select></div>
+          <details><summary>Generation settings <span>+</span></summary><div class="settings">
+            <div class="field"><label for="num_gaussians">Gaussians</label><select id="num_gaussians" name="num_gaussians"><option value="65536">65,536 · quick test</option><option value="131072">131,072 · lighter</option><option value="262144" selected>262,144 · balanced</option><option value="524288">524,288 · detailed</option><option value="1048576">1,048,576 · maximum</option></select></div>
+            <div class="two-col"><div class="field"><label for="steps">Steps</label><input id="steps" name="steps" type="number" min="10" max="100" value="50" required /></div><div class="field"><label for="seed">Seed</label><input id="seed" name="seed" type="number" min="0" max="2147483647" value="42" required /></div></div>
+            <div class="two-col"><div class="field"><label for="cfg_strength">Guidance</label><input id="cfg_strength" name="cfg_strength" type="number" min="0" max="10" step="0.1" value="3" required /></div><div class="field"><label for="rescale_t">Time shift</label><input id="rescale_t" name="rescale_t" type="number" min="1" max="6" step="0.1" value="3" required /></div></div>
+          </div></details>
+          <button id="generate" class="primary" type="submit" disabled>Generate 3D object <span>↗</span></button><p id="backend-label" class="fine">Connecting to the model server…</p>
+        </form>
+        <section class="panel result-panel"><div class="panel-heading"><span><b>02</b> A different perspective</span><span id="result-badge" class="badge">3D GAUSSIAN SPLAT</span></div><div id="stage"><div id="viewer"></div><div id="empty"><div class="object-mark"><i></i><i></i><i></i></div><h2>There’s more than meets the eye.</h2><p>Your 3D object will appear here.<br>Drag to orbit. Scroll to explore.</p></div><div id="busy" hidden><div class="spinner"></div><strong>Building another dimension</strong><p id="progress" role="status" aria-live="polite">Starting…</p>
+          <div class="generation-progress">
+            <div id="stage-list" aria-label="Generation stages">
+              <span data-stage="load">Load</span><span data-stage="preprocess">Prepare</span><span data-stage="encode">Analyze</span><span data-stage="sampling">Generate</span><span data-stage="decode">Build</span><span data-stage="save">Save</span><span data-stage="preview">Preview</span>
+            </div>
+            <progress id="generation-bar" max="1" aria-label="Current stage progress"></progress>
+            <span id="step-detail"></span>
+            <div class="generation-timing"><span id="elapsed">0s elapsed</span><span id="eta">Estimating time remaining…</span></div>
+          </div></div></div><div class="result-footer"><span id="result-info">Ready when you are.</span><a id="download" class="download" hidden download="idol-object.ply">Download .ply ↓</a></div></section>
+      </section>
+      <p id="message" role="status" aria-live="polite" hidden></p>
+      <footer><p>Best with a single, clearly visible object.</p><p>Powered by <a href="https://github.com/speridlabs/idol-sdk" target="_blank" rel="noreferrer">Idol</a> · Gaussian splatting</p></footer>
+    </main>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
