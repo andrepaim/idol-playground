@@ -510,6 +510,7 @@ function updateWalkControls() {
   const available = Boolean(walkProfile?.supported && cachedStatus?.walk?.ready);
   $('create-walk').disabled = busy || !available || !$('walk-reviewed').checked;
   $('paw-review').hidden = !available;
+  if (walkProfile && lastRigJob) $('walk-note').textContent = cachedStatus?.walk?.ready ? walkProfile.reason : 'Walking needs the Blender environment. Run make setup-rig.';
   $('walk-actions').querySelectorAll('select,input').forEach((input) => { input.disabled = busy; });
 }
 async function loadWalkProfile() {
@@ -565,6 +566,7 @@ async function showWalk(job) {
     $('empty').hidden = true;
   } catch (error) { $('empty').hidden = false; showError(`Walk saved, but preview failed. ${error.message}`); }
   await loadWalkProfile();
+  for (const [role,name] of Object.entries(job.settings.paws || {})) $(`paw-${role}`).value = name;
 }
 $('walk-reviewed').addEventListener('change',updateWalkControls);
 for (const role of ['fore_left','fore_right','hind_left','hind_right']) {

@@ -14,7 +14,7 @@ Downloads include the selected animated GLB, separate in-place and forward GLBs,
 
 The procedural profile uses the four-beat lateral sequence hind-left → fore-left → hind-right → fore-right, with a 65% stance fraction and conservative body bob. The [University of Minnesota veterinary anatomy reference](https://vanat.ahc.umn.edu/gaits/walk.html) describes the sequential four-beat walk and alternating two/three-foot support. Lift and stride are informed by the preceding private motion trial; this feature does not bundle or redistribute a motion capture file, train a model, or perform general motion retargeting.
 
-The native checks measure the lowest point and a patch centroid in four skin-weight-selected paw regions. They check planted-paw penetration/sliding, loop matrices and root displacement after GLB reimport, plus evaluated motion and appearance/binding in FBX and Blend. They do not prove whole-body collision freedom, biological accuracy, smooth anatomy on arbitrary generated rigs, or game-engine readiness. The inferred rear legs can still look approximate. Parent #26 remains open for broader anatomical mapping and quality work.
+The native checks measure the lowest point and a patch centroid in four skin-weight-selected paw regions. They check planted-paw penetration/sliding, loop matrices, a bounded endpoint velocity check and root displacement after GLB reimport, plus evaluated motion and appearance/binding in FBX and Blend. They do not prove whole-body collision freedom, biological accuracy, smooth anatomy on arbitrary generated rigs, or game-engine readiness. The inferred rear legs can still look approximate. Parent #26 remains open for broader anatomical mapping and quality work.
 
 ## Local validation
 

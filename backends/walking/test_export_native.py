@@ -82,6 +82,20 @@ class WalkingExport(unittest.TestCase):
                 imported.animation_data.action = bpy.data.actions["Walk_" + variant]
                 verify_motion(imported, 31, 0.16, variant, 1)
 
+    def test_same_endpoint_with_abrupt_last_frame_is_rejected(self):
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        bpy.ops.object.armature_add()
+        a = bpy.context.object
+        a.data.bones[0].name = "bone_0"
+        b = a.pose.bones[0]
+        b.rotation_mode = "XYZ"
+        for frame, angle in ((1, 0), (2, 0.01), (16, 0.1), (30, 1.0), (31, 0)):
+            b.rotation_euler = (angle, 0, 0)
+            b.keyframe_insert(data_path="rotation_euler", frame=frame)
+        bpy.context.scene.render.fps = 30
+        with self.assertRaisesRegex(ValueError, "velocity"):
+            verify_motion(a, 31, 0.16, "inplace", 1)
+
 
 if __name__ == "__main__":
     result = unittest.main(exit=False).result

@@ -347,7 +347,8 @@ def verify_motion(a, frames, stride, variant, start):
 
     snapshots = []
     span = (frames - 1) / 30 * bpy.context.scene.render.fps / bpy.context.scene.render.fps_base
-    for frame in (start, start + span / 2, start + span):
+    step = span / (frames - 1)
+    for frame in (start, start + step, start + span / 2, start + span - step, start + span):
         bpy.context.scene.frame_set(int(frame), subframe=frame - int(frame))
         bpy.context.view_layer.update()
         snapshots.append(
@@ -359,9 +360,21 @@ def verify_motion(a, frames, stride, variant, start):
     rotation_error = float(np.max(np.abs(snapshots[-1][:, :3, :3] - snapshots[0][:, :3, :3])))
     if error > max(0.001, stride * 0.005) or rotation_error > 0.001:
         raise ValueError("Exported root/loop displacement or rotation differs from the baked walk")
-    if np.max(np.abs(snapshots[1] - snapshots[0])) < 0.001:
+    if np.max(np.abs(snapshots[2] - snapshots[0])) < 0.001:
         raise ValueError("Exported walk has no evaluated motion")
-    return {"loop_displacement_error": error, "loop_rotation_error": rotation_error}
+    # Finite differences at 30 Hz are an approximation to endpoint velocity.
+    # Check rotation separately from translations, which depend on model scale.
+    jump = (snapshots[1] - snapshots[0]) - (snapshots[-1] - snapshots[-2])
+    rotation_jump = float(np.max(np.abs(jump[:, :3, :3])))
+    translation_jump = float(np.max(np.abs(jump[:, :3, 3])))
+    if rotation_jump > 0.08 or translation_jump > stride * 0.1:
+        raise ValueError("Exported loop has an abrupt endpoint velocity change")
+    return {
+        "loop_displacement_error": error,
+        "loop_rotation_error": rotation_error,
+        "loop_rotation_frame_delta_error": rotation_jump,
+        "loop_translation_frame_delta_error": translation_jump,
+    }
 
 
 def exported_contacts(raw, a, folder, report, variant):
