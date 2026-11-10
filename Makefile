@@ -31,3 +31,11 @@ check-security:
 	./scripts/security.sh
 test-gpu:
 	$(LOCAL_PYTHON) scripts/gpu_smoke.py --receipt .local/gpu-receipt.json
+
+.PHONY: setup-mesh mesh-models test-mesh-backend
+setup-mesh:
+	./scripts/setup-mesh.sh
+mesh-models:
+	$(if $(wildcard $(LOCAL_PYTHON)),$(LOCAL_PYTHON),$(CHECK_PYTHON)) mesh_setup.py
+test-mesh-backend:
+	.venv-triposr/bin/python -m unittest discover -s backends/triposr -p 'test_*.py'

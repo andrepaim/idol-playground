@@ -26,4 +26,4 @@ Open http://127.0.0.1:8000. `make setup-local` installs the CUDA SDK into `.venv
 
 The app binds to loopback. `PORT=8002 make run` selects another port. Export variables in your shell; `.env.example` is documentation and the server does not automatically load `.env`.
 
-Inputs and results live in `outputs/<job-id>`. Do not delete or move active-job directories. Completed `job.json` survives restarts; interrupted inference cannot currently resume. The Game Character workflow is planned, not installed.
+Inputs and results live in `outputs/<job-id>`. Do not delete or move active-job directories. Completed `job.json` survives restarts; interrupted inference cannot currently resume. For textured GLB output, follow [mesh setup](mesh-generation.md). Rigging and animation are subsequent work.

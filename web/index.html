@@ -15,15 +15,27 @@
         <form id="form" class="panel input-panel">
           <div class="panel-heading"><span><b>01</b> Your image</span><span class="small">PNG · JPG · WEBP</span></div>
           <label id="dropzone" class="dropzone" tabindex="0" for="image"><input type="file" id="image" name="image" accept="image/png,image/jpeg,image/webp" required /><div id="upload-prompt"><div class="upload-icon">↥</div><strong>Drop an image here</strong><span>or click to browse · up to 20 MB</span></div><img id="image-preview" alt="Your uploaded object" hidden /><span id="replace" hidden>Click to replace</span></label>
+          <div class="field"><label for="output_type">Output</label><select id="output_type" name="output_type"><option value="splat">3D splat · .ply</option><option value="mesh">Textured mesh · .glb</option></select></div>
+          <div id="splat-options">
           <div class="field"><label for="mode">Image type</label><select id="mode" name="mode"><option value="real">Real photograph</option><option value="synthetic">Render / AI-generated image</option></select></div>
           <details><summary>Generation settings <span>+</span></summary><div class="settings">
             <div class="field"><label for="num_gaussians">Gaussians</label><select id="num_gaussians" name="num_gaussians"><option value="65536">65,536 · quick test</option><option value="131072">131,072 · lighter</option><option value="262144" selected>262,144 · balanced</option><option value="524288">524,288 · detailed</option><option value="1048576">1,048,576 · maximum</option></select></div>
             <div class="two-col"><div class="field"><label for="steps">Steps</label><input id="steps" name="steps" type="number" min="10" max="100" value="50" required /></div><div class="field"><label for="seed">Seed</label><input id="seed" name="seed" type="number" min="0" max="2147483647" value="42" required /></div></div>
             <div class="two-col"><div class="field"><label for="cfg_strength">Guidance</label><input id="cfg_strength" name="cfg_strength" type="number" min="0" max="10" step="0.1" value="3" required /></div><div class="field"><label for="rescale_t">Time shift</label><input id="rescale_t" name="rescale_t" type="number" min="1" max="6" step="0.1" value="3" required /></div></div>
           </div></details>
-          <button id="generate" class="primary" type="submit" disabled>Generate 3D object <span>↗</span></button><p id="backend-label" class="fine">Connecting to the model server…</p>
+          </div>
+          <div id="mesh-options" hidden>
+            <div class="field"><label for="target_faces">Triangle budget</label><select id="target_faces" name="target_faces" disabled><option value="10000">10,000 · lighter</option><option value="25000" selected>25,000 · balanced</option><option value="50000">50,000 · detailed</option><option value="100000">100,000 · maximum</option></select></div>
+            <div class="field"><label for="texture_resolution">Texture size</label><select id="texture_resolution" name="texture_resolution" disabled><option value="512">512 px · quick test</option><option value="1024" selected>1024 px · balanced</option><option value="2048">2048 px · detailed</option></select></div>
+            <details><summary>Mesh settings <span>+</span></summary><div class="settings">
+              <div class="field"><label for="mesh_resolution">Surface resolution</label><select id="mesh_resolution" name="mesh_resolution" disabled><option value="128">128 · draft</option><option value="192" selected>192 · standard</option><option value="256">256 · fine</option></select></div>
+              <div class="field"><label for="mesh_seed">Seed</label><input id="mesh_seed" name="seed" type="number" min="0" max="2147483647" value="42" required disabled /></div>
+            </div></details>
+            <p class="mesh-note">Unrigged mesh. Inspect the geometry before animation.</p>
+          </div>
+          <button id="generate" class="primary" type="submit" disabled>Generate 3D object <span>↗</span></button><button id="cancel" class="cancel-button" type="button" hidden>Cancel generation</button><p id="backend-label" class="fine">Connecting to the model server…</p>
         </form>
-        <section class="panel result-panel"><div class="panel-heading"><span><b>02</b> A different perspective</span><span id="result-badge" class="badge">3D GAUSSIAN SPLAT</span></div><div id="stage"><div id="viewer"></div><div id="empty"><div class="object-mark"><i></i><i></i><i></i></div><h2>There’s more than meets the eye.</h2><p>Your 3D object will appear here.<br>Drag to orbit. Scroll to explore.</p></div><div id="busy" hidden><div class="spinner"></div><strong>Building another dimension</strong><p id="progress" role="status" aria-live="polite">Starting…</p>
+        <section class="panel result-panel"><div class="panel-heading"><span><b>02</b> A different perspective</span><span id="result-badge" class="badge">3D GAUSSIAN SPLAT</span></div><div id="mesh-toolbar" hidden><label><input id="wireframe" type="checkbox" /> Wireframe</label><button id="reset-view" type="button">Reset view</button></div><div id="stage"><div id="viewer"></div><div id="empty"><div class="object-mark"><i></i><i></i><i></i></div><h2>There’s more than meets the eye.</h2><p>Your 3D object will appear here.<br>Drag to orbit. Scroll to explore.</p></div><div id="busy" hidden><div class="spinner"></div><strong>Building another dimension</strong><p id="progress" role="status" aria-live="polite">Starting…</p>
           <div class="generation-progress">
             <div id="stage-list" aria-label="Generation stages">
               <span data-stage="load">Load</span><span data-stage="preprocess">Prepare</span><span data-stage="encode">Analyze</span><span data-stage="sampling">Generate</span><span data-stage="decode">Build</span><span data-stage="save">Save</span><span data-stage="preview">Preview</span>
@@ -34,7 +46,7 @@
           </div></div></div><div class="result-footer"><span id="result-info">Ready when you are.</span><a id="download" class="download" hidden download="idol-object.ply">Download .ply ↓</a></div></section>
       </section>
       <p id="message" role="status" aria-live="polite" hidden></p>
-      <footer><p>Best with a single, clearly visible object.</p><p>Powered by <a href="https://github.com/speridlabs/idol-sdk" target="_blank" rel="noreferrer">Idol</a> · Gaussian splatting</p></footer>
+      <footer><p>Best with a single, clearly visible object.</p><p id="engine-credit">Powered by <a href="https://github.com/speridlabs/idol-sdk" target="_blank" rel="noreferrer">Idol</a> · Gaussian splatting</p></footer>
     </main>
     <script type="module" src="/main.js"></script>
   </body>

@@ -8,4 +8,4 @@ This repository contains application source and dependency/model references. It 
 - [GaussianSplats3D](https://github.com/mkkellogg/GaussianSplats3D) and [Three.js](https://github.com/mrdoob/three.js): MIT-licensed viewer dependencies; preserve bundled notices.
 - Validation routing, Markdown link checking, and repository guard patterns were adapted from the owner's DistillPod project at the owner's request.
 
-Model cards and available notices are retained by the downloader. Review upstream terms when changing pinned revisions or distributing assets. Proposed TripoSR/UniRig components are not installed by this scaffold.
+Model cards and available notices are retained by the downloader. Review upstream terms when changing pinned revisions or distributing assets. The optional mesh backend installs pinned TripoSR code/weights, DINO configuration, U2Net/rembg, PyMCubes, xatlas, trimesh, and fast-simplification. Preserve their respective upstream licenses; TripoSR source/model use MIT terms and PyMCubes uses BSD terms. UniRig integration is subsequent work.

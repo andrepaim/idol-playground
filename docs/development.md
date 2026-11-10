@@ -19,6 +19,8 @@ Keep one active issue per session and coordinate GPU/port ownership. Worktrees d
 | Command | Purpose |
 |---|---|
 | `make bootstrap` | Locked CPU development install, Chromium, frontend build |
+| `make setup-mesh mesh-models` | Separate TripoSR environment and public mesh assets |
+| `make test-mesh-backend` | Native surface/UV-normal regressions in the mesh environment |
 | `make setup-local` | Locked CUDA SDK environment |
 | `make models` | Pinned public model download |
 | `make doctor` | Read-only readiness report |

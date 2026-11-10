@@ -2,8 +2,30 @@ import './style.css';
 
 const $ = (id) => document.getElementById(id);
 let viewer, renderer, resizeObserver, previewUrl, busy = false, serverReady = false;
-let latestProgress, progressReceivedAt, generationStartedAt;
-const stages = ['load', 'preprocess', 'encode', 'sampling', 'decode', 'save', 'preview'];
+let latestProgress, progressReceivedAt, generationStartedAt, meshViewer, activeJobId, cachedStatus;
+const splatStages = [['load','Load'], ['preprocess','Prepare'], ['encode','Analyze'], ['sampling','Generate'], ['decode','Build'], ['save','Save'], ['preview','Preview']];
+const meshStages = [['preprocess','Prepare'], ['load','Load'], ['reconstruct','Generate'], ['extract','Surface'], ['simplify','Optimize'], ['texture','Texture'], ['export','Save'], ['preview','Preview']];
+let stages = splatStages.map(([stage]) => stage);
+
+function isMesh() { return $('output_type').value === 'mesh'; }
+
+function syncOutputControls() {
+  $('splat-options').hidden = isMesh();
+  $('mesh-options').hidden = !isMesh();
+  $('splat-options').querySelectorAll('input,select').forEach((input) => { input.disabled = busy || isMesh(); });
+  $('mesh-options').querySelectorAll('input,select').forEach((input) => { input.disabled = busy || !isMesh(); });
+}
+
+function configureStages() {
+  const definitions = isMesh() ? meshStages : splatStages;
+  stages = definitions.map(([stage]) => stage);
+  $('stage-list').replaceChildren(...definitions.map(([stage, label]) => {
+    const item = document.createElement('span');
+    item.dataset.stage = stage;
+    item.textContent = label;
+    return item;
+  }));
+}
 
 function duration(seconds) {
   const rounded = Math.max(1, Math.ceil(seconds));
@@ -39,10 +61,10 @@ function showProgress(job) {
     if (index === itemIndex) item.setAttribute('aria-current', 'step');
     else item.removeAttribute('aria-current');
   });
-  if (job.stage === 'sampling' && job.step != null) {
+  if (['sampling', 'extract', 'texture'].includes(job.stage) && job.step != null && job.total_steps > 0) {
     $('generation-bar').max = job.total_steps;
     $('generation-bar').value = job.step;
-    $('step-detail').textContent = `Sampling step ${job.step} of ${job.total_steps}`;
+    $('step-detail').textContent = job.stage === 'sampling' ? `Sampling step ${job.step} of ${job.total_steps}` : `${job.stage === 'texture' ? 'Texture' : 'Surface'} samples · ${Math.round(job.step / job.total_steps * 100)}%`;
   } else {
     $('generation-bar').removeAttribute('value');
     $('step-detail').textContent = job.stage === 'preview' ? 'Preparing the interactive viewer…' : '';
@@ -106,6 +128,9 @@ for (const name of ['dragenter', 'dragover', 'dragleave', 'drop']) {
 }
 
 async function disposeViewer() {
+  meshViewer?.dispose();
+  meshViewer = undefined;
+  $('mesh-toolbar').hidden = true;
   resizeObserver?.disconnect();
   try {
     if (viewer) await viewer.dispose();
@@ -156,17 +181,35 @@ async function watchJob(id) {
     const job = await request(`/api/jobs/${id}`);
     showProgress(job);
     if (job.state === 'error') throw new Error(job.message);
+    if (job.state === 'cancelled') {
+      $('result-info').textContent = 'Generation cancelled.';
+      $('empty').hidden = false;
+      return;
+    }
     if (job.state === 'complete') {
-      $('download').href = job.files['object.ply'];
+      const mesh = job.output_type === 'mesh' || Boolean(job.files['object.glb']);
+      const file = mesh ? job.files['object.glb'] : job.files['object.ply'];
+      $('download').href = file;
+      $('download').download = mesh ? 'idol-mesh.glb' : 'idol-object.ply';
+      $('download').textContent = mesh ? 'Download .glb ↓' : 'Download .ply ↓';
+      $('result-badge').textContent = mesh ? 'TEXTURED POLYGON MESH' : '3D GAUSSIAN SPLAT';
       $('download').hidden = false;
-      $('result-info').textContent = `${Number(job.settings.num_gaussians).toLocaleString()} Gaussians · ${job.seconds}s · seed ${job.settings.seed}`;
-      showProgress({ stage: 'preview', message: 'Downloading the PLY and preparing the interactive 3D preview…' });
+      $('result-info').textContent = mesh ? `${Number(job.mesh.triangles).toLocaleString()} triangles · ${job.mesh.texture_resolution}px texture · ${job.seconds}s` : `${Number(job.settings.num_gaussians).toLocaleString()} Gaussians · ${job.seconds}s · seed ${job.settings.seed}`;
+      showProgress({ stage: 'preview', message: mesh ? 'Opening the textured mesh preview…' : 'Downloading the PLY and preparing the interactive 3D preview…' });
       try {
-        await loadViewer(job.files['object.ply']);
+        if (mesh) {
+          await disposeViewer();
+          const { loadMeshViewer } = await import('./mesh-viewer.js');
+          meshViewer = await loadMeshViewer($('viewer'), file);
+          $('wireframe').checked = false;
+          $('mesh-toolbar').hidden = false;
+        } else {
+          await loadViewer(file);
+        }
         $('empty').hidden = true;
       } catch (error) {
         $('empty').hidden = false;
-        showError(`Generation succeeded, but the 3D preview could not load. You can download the PLY. ${error.message}`);
+        showError(`Generation succeeded, but the 3D preview could not load. You can download the ${mesh ? 'GLB' : 'PLY'}. ${error.message}`);
       }
       return;
     }
@@ -181,6 +224,10 @@ $('form').addEventListener('submit', async (event) => {
   updateButton();
   const formData = new FormData($('form'));
   $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
+  configureStages();
+  activeJobId = undefined;
+  $('cancel').hidden = !isMesh();
+  $('cancel').disabled = true;
   $('message').hidden = true;
   $('download').hidden = true;
   $('empty').hidden = true;
@@ -192,39 +239,65 @@ $('form').addEventListener('submit', async (event) => {
   try {
     await disposeViewer();
     const job = await request('/api/generate', { method: 'POST', body: formData });
+    activeJobId = job.id;
+    $('cancel').disabled = false;
     await watchJob(job.id);
   } catch (error) {
     showError(error.message);
     $('result-info').textContent = 'Generation could not finish.';
-    if (!viewer) $('empty').hidden = false;
+    if (!viewer && !meshViewer) $('empty').hidden = false;
   } finally {
     clearInterval(tick);
     $('busy').hidden = true;
     $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = false; });
     busy = false;
+    activeJobId = undefined;
+    $('cancel').hidden = true;
+    syncOutputControls();
     updateButton();
   }
 });
 
+function applyStatus() {
+  if (!cachedStatus) return;
+  $('engine-credit').innerHTML = isMesh() ? 'Powered by <a href="https://github.com/VAST-AI-Research/TripoSR" target="_blank" rel="noreferrer">TripoSR</a> · Mesh reconstruction' : 'Powered by <a href="https://github.com/speridlabs/idol-sdk" target="_blank" rel="noreferrer">Idol</a> · Gaussian splatting';
+  const status = isMesh() ? cachedStatus.mesh : cachedStatus;
+  serverReady = Boolean(status?.ready);
+  $('backend-label').textContent = isMesh()
+    ? (status?.weights_downloaded ? 'Models downloaded · mesh generation runs locally.' : 'Local mesh generation. First use downloads its model files.')
+    : (status?.weights_downloaded ? 'Models downloaded · inference runs on your GPU.' : 'Inference runs on your GPU. First run downloads the model weights.');
+  if (!serverReady) {
+    $('setup').innerHTML = isMesh()
+      ? '<strong>Finish mesh setup to generate.</strong> Run <code>make setup-mesh mesh-models</code>. Mesh generation uses its own environment and public model files.'
+      : '<strong>Finish local setup to generate.</strong> Install the model dependencies with <code>uv sync --extra local</code>. Model weights download automatically from public repositories; no Hugging Face login is required.';
+    $('setup').hidden = false;
+  } else {
+    $('setup').hidden = true;
+  }
+  syncOutputControls();
+  updateButton();
+}
+
 async function checkStatus() {
   try {
-    const status = await request('/api/status');
-    serverReady = status.ready;
-    $('backend-label').textContent = status.weights_downloaded
-      ? 'Models downloaded · inference runs on your GPU.'
-      : 'Inference runs on your GPU. First run downloads the model weights.';
-    if (!status.ready) {
-      $('setup').innerHTML = '<strong>Finish local setup to generate.</strong> Install the model dependencies with <code>uv sync --extra local</code>. Model weights download automatically from public repositories; no Hugging Face login is required.';
-      $('setup').hidden = false;
-    } else {
-      $('setup').hidden = true;
-    }
-    updateButton();
+    cachedStatus = await request('/api/status');
+    applyStatus();
   } catch {
     serverReady = false;
     updateButton();
-    showError('Could not reach the model server. Start it with uv run uvicorn app:app --host 127.0.0.1 --port 8000.');
+    showError('Could not reach the model server. Start it with ./run.sh.');
   }
 }
+
+$('output_type').addEventListener('change', () => { syncOutputControls(); applyStatus(); });
+$('wireframe').addEventListener('change', () => meshViewer?.wireframe($('wireframe').checked));
+$('reset-view').addEventListener('click', () => meshViewer?.reset());
+$('cancel').addEventListener('click', async () => {
+  if (!activeJobId) return;
+  $('cancel').disabled = true;
+  try { await request(`/api/jobs/${activeJobId}/cancel`, { method: 'POST' }); }
+  catch (error) { showError(error.message); }
+});
+syncOutputControls();
 checkStatus();
 setInterval(() => { if (!busy && !serverReady) checkStatus(); }, 10000);

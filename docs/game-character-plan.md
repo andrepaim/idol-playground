@@ -1,6 +1,6 @@
 # Game Character generation plan
 
-Status: proposed; implementation has not started.
+Status: in progress. The direct photo-to-textured-mesh increment is implemented and under validation; automatic rigging and animation remain subsequent work. See [mesh generation](mesh-generation.md) and the [implementation plan](photo-mesh-implementation.md).
 
 Add a **Game Character** mode that turns an uploaded image into a textured, rigged mesh, with a browser preview and downloadable files for a game engine.
 
@@ -10,7 +10,7 @@ This plan assumes engine-neutral exports until a target engine is selected. All 
 
 ## 1. First-release scope
 
-Target full-body humanoid characters, especially simple stylized characters in an A-pose or T-pose.
+Target full-body humanoids and quadrupeds, including Paçoca as a challenging real-photo case. Favor separated limbs and clear body poses; A/T poses are suitable humanoid starting points.
 
 | Output | Purpose |
 |---|---|
