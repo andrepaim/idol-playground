@@ -1,0 +1,29 @@
+# Natural dog walking
+
+Authorized after the owner accepted splat-derived meshes and experimental rigging. Issue #26. Start with dogs walking straight on flat ground, using local Blender processing and a verified animal motion reference. Existing geometry, colors, skinning and diagnostic rig remain preserved. Other gaits, humanoids, terrain, controllers and sit-to-stand transitions are subsequent milestones.
+
+## Gates and implementation order
+
+1. Verify motion provenance and inspect a real dog reference walk. Pin the source archive, selected clip/frame range, checksums, frame rate, units, contact annotations and attribution. Candidate: original BVH animal capture in Lifelike Agility, publisher dataset DOI 10.6084/m9.figshare.24968946, CC BY 4.0; robot-retargeted motion is unsuitable as the anatomical reference. AnyTop remains research until dependencies, source rights and hardware are independently established.
+2. Inspect reference and generated rigs. Identify four valid leg chains, shoulders/elbows/wrists/front paws, hips/stifles/hocks/rear paws, pelvis/chest/spine/head and optional tail. Establish axes, ground and scale. Generic bone names require geometry, hierarchy and skin-weight evidence; do not guess from names alone. Inspect the existing seated dog in a standing pose. Missing articulation or severe standing deformation blocks dependent animation UI work; create private visual evidence and record the required correction.
+3. Persist a versioned joint mapping and confidence report keyed by source rig digest. Provide a compact highlighted-bone correction UI; reject missing, reused, swapped or contradictory chains. Standing-pose correction must not silently replace bind matrices/rest geometry. Corrections create a derived source with appearance/binding validation.
+4. Retarget verified reference rotations through rest-pose and bone-axis corrections, adapt proportions, and distribute spine motion. Preserve bone lengths. Detect paw stance/swing intervals, solve leg IK with anatomical bend directions and joint limits, correct root/pelvis support and ground clearance, and prevent sliding without artificial leg stretching. A motion curve that merely oscillates bones does not satisfy natural walking.
+5. Build a canonical loop at 30 fps with position and velocity continuity, then derive Walk_InPlace and Walk_Forward. Forward motion accumulates cycle displacement; in-place validation uses implied moving ground. Keep pelvis bob/sway separate from locomotion. Playback inspection speed differs from regenerated stride/cadence. Use normalized body scale until physical height is supplied.
+6. Add animation runtime/setup/workers and POST /api/jobs/{rig_id}/animate, independent readiness and source/mapping/settings validation. Use the existing exclusive slot, bounded subprocesses and cancellation/reaping. Stages: inspect, map, standing calibration, retarget, contacts, loop, bake, verify. Persist atomic stage metadata and provenance; reuse intermediates only when source/settings match. Failures preserve the rig. Initial Blender-only processing does not require a new neural model; benchmark RAM/time, and require actual RTX 3060 checks for changed inference/model ownership.
+7. Extend the viewer with named clips, timeline, play/pause/loop/scrub, skeleton and paw-contact overlays, ground grid, fixed/follow camera and rest/reset. Create walking from a completed rig with speed and movement variants. Low-confidence mapping requests correction. Old mesh, rig and diagnostic behavior remains supported.
+8. Export animated.glb, animated.fbx, character.blend, animation.json and attribution/import notes. Bake evaluated constraints into ordinary tracks. Independently reimport every format and compare sampled transforms, duration, skeleton, binding and appearance. Use a lightweight analysis proxy when necessary while preserving the accepted dense render mesh. Engine-neutral export precedes a separate selected-engine acceptance step.
+
+## Validation and acceptance
+
+Meaningful TDD covers coordinate/rest transforms, chain mapping rejection, contact windows, sliding, loop velocity/seams, root variants, persistence/source preservation, missing setup, failed workers, busy rejection and cancellation. Native Blender fixtures check evaluated IK and export round trips. Browser acceptance checks clip lifecycle, scrubbing, preview/reset/disposal, progress/ETA, saved results and failed/cancelled retries.
+
+Real acceptance uses a suitable reference dog, the seated owner dog and another generated standing dog if available. Review multiple strides from front, side and three-quarter views at normal and slow speed. Record bone-length error, planted-foot drift, penetration, swing clearance, discontinuities, joint flips, intersections and skin collapse. Initial engineering tolerances (to calibrate against reference) are planted drift <1% standing shoulder height and penetration <0.5%; these are provisional and do not prove naturalness. Numerical success requires visual acceptance as well. A useful standing/deformation gate precedes any natural-walk claim.
+
+Each increment uses its own worktree/branch, current-main integration, review, applicable checks, PR merge and combined-main CI. Keep owner media, raw logs and motion archives outside commits. No release or asset publication is authorized. Record blockers rather than silently weakening failed quality gates. Estimate delivery after the reference/standing experiment establishes feasibility.
+
+## Sources
+
+- [Publisher BVH dataset](https://doi.org/10.6084/m9.figshare.24968946)
+- [Authors' motion documentation](https://github.com/Tencent-RoboticsX/lifelike-agility-and-play)
+- [AnyTop implementation and preprocessing limitations](https://github.com/Anytop2025/Anytop)
+- [Blender animation tools](https://www.blender.org/features/animation/)
