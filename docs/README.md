@@ -18,3 +18,5 @@
 - [Splat-derived mesh experiment](splat-mesh-results.md): local fidelity results and reproduction.
 
 - [Splat-mesh integration validation](splat-mesh-integration-validation.md): actual app/GPU acceptance and remaining limits.
+
+- [Natural dog walking plan](natural-walking-plan.md): motion reference, standing-pose gate, retargeting and app milestones.
