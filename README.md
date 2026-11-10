@@ -1,10 +1,10 @@
 # Idol Playground
 
-A local image-to-3D web app: generate a Gaussian splat (`.ply`) with [Idol](https://huggingface.co/speridlabs/idol), or convert that splat to a vertex-colored polygon mesh (`.glb`) using calibrated stereo views, DLNR and surface fusion. [TripoSR](https://github.com/VAST-AI-Research/TripoSR) remains an optional legacy mesh method. Preview the result in your browser and download it.
+Turn a single image into a 3D Gaussian splat or polygon mesh in a local web app. Preview results in the browser, download a turntable video, or use the experimental tools to rig a mesh and animate a supported canine rig. Splat generation uses [Idol](https://huggingface.co/speridlabs/idol).
 
 ## See it in action
 
-Paçoca, reconstructed from a single photograph and rotated in the local app.
+Paçoca, reconstructed from one photograph and rotated in the app.
 
 [![Paçoca’s photograph alongside a rotating 3D Gaussian splat in Idol Playground](docs/demos/pacoca-turntable.gif)](docs/demos/pacoca-turntable.mp4?raw=1)
 
@@ -12,7 +12,13 @@ Paçoca, reconstructed from a single photograph and rotated in the local app.
 
 ## Run locally
 
-Requires Python 3.11–3.13, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ (or 22.12+), and an NVIDIA CUDA GPU or an Apple Silicon Mac. The model card reports approximately 7.2 GB peak VRAM at default settings. This machine's RTX 3060 has 12 GB; other GPU applications also consume VRAM.
+| Workflow | Supported setup |
+| --- | --- |
+| Gaussian splats | Linux or WSL with NVIDIA CUDA, or macOS on Apple Silicon with PyTorch MPS |
+| Polygon meshes and automatic rigging | Linux or WSL on x86-64 with NVIDIA CUDA |
+| Canine walking | The Blender environment installed by `make setup-rig`, plus a completed supported rig |
+
+Install Git, [uv](https://docs.astral.sh/uv/) 0.12.3, Python 3.11 and Node.js 22. The project pins its development Node version in [`.node-version`](.node-version). Optional backend setup and development commands also use Make. The preview requires WebGL2.
 
 ```bash
 git clone https://github.com/andrepaim/idol-playground.git
@@ -20,82 +26,70 @@ cd idol-playground
 uv sync --locked --extra local
 npm ci
 npm run build
-```
-
-Download the model files and start the app. No Hugging Face account or login is required:
-
-```bash
 uv run --no-sync python model_setup.py
 ./run.sh
 ```
 
-Open **http://127.0.0.1:8000**. If you skip the explicit download command, the first generation downloads the missing files automatically. Once downloaded, the app loads all model components from local directories.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Use `PORT=8002 ./run.sh` to select a different port. The server binds to loopback for personal use.
 
-Weights and encoders total about 5 GB. Model loading takes longer than subsequent requests. Idol stays in memory between splat requests and unloads before mesh generation. Requests run one at a time. CUDA or Apple Silicon MPS must be available to PyTorch; the app does not fall back to slow CPU inference. On a Mac, splat generation runs eagerly (the SDK's optimized sampling path is CUDA-only); polygon meshes and rigging still require CUDA. This uses the upstream SDK pinned to commit `8db700349a5570aac390e4780fa32e3eed6b587a`.
+The initial splat model download is about 5 GB and uses public assets without a Hugging Face login. You can skip `model_setup.py` and let the first generation download missing files. Subsequent inference loads the cached files locally.
 
-## Polygon meshes
+PyTorch must detect CUDA or MPS for splat generation. `make doctor` reports the accelerator and model setup. If you hit a memory limit, close other GPU applications and reduce the Gaussian count. Idol’s model card reports about 7.2 GB of peak VRAM for a full request. Available memory and usage depend on your hardware and settings. [Idol model card](https://huggingface.co/speridlabs/idol)
 
-Add splat-derived meshing to an existing Idol installation:
+Idol stays loaded between splat jobs. Starting a mesh, rig or walk job releases the cached model, so the next splat job reloads it. CUDA splat sampling runs without compilation by default. Set `IDOL_OPTIMIZE=1 ./run.sh` to try the SDK's optimized CUDA path. Apple Silicon uses eager sampling. [Getting started](docs/getting-started.md) · [Apple Silicon validation](docs/validation.md#apple-silicon-splats)
+
+## Generate and preview a splat
+
+Upload a PNG, JPEG or WebP up to 20 MiB and 25 megapixels. The app corrects EXIF orientation and scales the longest side to at most 2,048 pixels. Choose **Real photograph** or **Render / AI-generated image**, select **3D splat · .ply**, and generate. A clear image of one object works best.
+
+The defaults are 50 steps, 262,144 Gaussians, guidance 3, time shift 3 and seed 42. For a quick first run, try 10 steps and 65,536 Gaussians. Progress shows stages, completed sampling steps and an adaptive ETA. The estimate excludes initial model download and browser preview loading.
+
+Drag to orbit, scroll to zoom and right-drag to pan. Download the `.ply` to use the splat in a compatible viewer. The download remains available if the preview fails.
+
+## Create a polygon mesh
 
 ```sh
 make setup-splat-mesh splat-mesh-models
-npm run build
-./run.sh
 ```
 
-Choose **3D mesh · .glb**, with **From Idol splat · preferred**, to generate a splat and reconstruct its surface. To reuse a completed splat, select it from saved results and click **Create mesh from this splat**. This skips Idol inference and preserves the original job. Progress includes rendered images, stereo pairs, stages and an adaptive ETA; mesh jobs can be cancelled.
+Choose **3D mesh · .glb** and **From Idol splat · preferred** to reconstruct a surface from the generated splat. To skip Idol inference, reopen a completed splat and select **Create mesh from this splat**. Conversion creates a separate job and exports a vertex-colored `.glb` using calibrated stereo views, DLNR depth estimation and surface fusion.
 
-The GLB stores vertex colors. It preserves the reviewed splat's shape better than the independent TripoSR reconstruction in the tested dog example, but remains a dense, unrigged prototype with possible holes. View capture can take several minutes with software WebGL. Inspect geometry before using experimental rigging.
+For a UV-textured `.glb` reconstructed directly from the photo, install `make setup-mesh mesh-models` and select **TripoSR · legacy**. Inspect either mesh for holes, fused limbs and other reconstruction errors before rigging. The splat-derived method can produce dense geometry, and view capture can take several minutes with software WebGL. [Mesh setup, settings and limitations](docs/mesh-generation.md)
 
-The stereo backend has its own locked Python/CUDA environment. Workers exit after each job and share the app's single-job slot. TripoSR remains available through `make setup-mesh mesh-models` and the legacy method selector. See [mesh setup, settings, API compatibility and limitations](docs/mesh-generation.md).
+## Rig and animate a character
+
+```sh
+make setup-rig rig-models
+```
+
+Open a completed mesh and select **Auto rig · experimental** to add a skeleton and skin weights with UniRig. Use **Skeleton** and **Test bend** to inspect the result. The rig is saved separately and includes GLB, FBX and editable Blender exports. [Automatic rigging](docs/automatic-rigging.md)
+
+For a rig that matches the supported 34-bone canine hierarchy, review the paw assignments, choose a gait and travel mode, then select **Create walking animation**. Walking uses the existing Blender environment and the source rig’s retained skin data. The preview supports playback, scrubbing and camera follow. Download separate in-place and forward GLBs, an FBX with both clips, or an editable Blender file. Inspect deformation and test the exports in your engine before using them in a game. [Canine walking](docs/canine-walking.md)
+
+## Record videos and reopen results
+
+**Download video** records one full orbit from the current view in a supported browser. It targets eight seconds at 30 fps at the preview’s size and exports MP4 or WebM according to browser support. Recording can take longer on a slow renderer. On a walking result, it holds the current pose during capture and restores playback afterward. The video is created in the browser. [Recording details](docs/architecture.md)
+
+Use **Open a saved result** to reopen completed splats, meshes, rigs and walks after a restart. Inputs, exports and job metadata are stored in `outputs/<job-id>/`. The app runs one generation job at a time. Mesh, rig and walk jobs support cancellation. Restart interrupted jobs from their original inputs. To reclaim disk space, delete completed job folders while the app is idle.
 
 ## Idol model sources
 
-`model_setup.py` pins and downloads only the necessary files into the ignored `models/` directory:
+The app pins the [Idol SDK](https://github.com/speridlabs/idol-sdk/tree/8db700349a5570aac390e4780fa32e3eed6b587a) and downloads the following components into `models/`. [Downloader](model_setup.py)
 
 | Component | Public source | Pinned revision |
 | --- | --- | --- |
-| Idol + background remover | [speridlabs/idol](https://huggingface.co/speridlabs/idol) | `2731c2291fc65a797c5cb627a5e5526fc1490902` |
+| Idol and background remover | [speridlabs/idol](https://huggingface.co/speridlabs/idol) | `2731c2291fc65a797c5cb627a5e5526fc1490902` |
 | DINOv3 ViT-H+/16 | [LibreYOLO/LibreDINOv3vith16plus](https://huggingface.co/LibreYOLO/LibreDINOv3vith16plus) | `e849a3492905c6dabc89758042bf1402770fb4e6` |
-| FLUX.2 VAE only | [black-forest-labs/FLUX.2-klein-4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) | `e7b7dc27f91deacad38e78976d1f2b499d76a294` |
+| FLUX.2 VAE | [black-forest-labs/FLUX.2-klein-4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) | `e7b7dc27f91deacad38e78976d1f2b499d76a294` |
 
-The DINOv3 source is a community mirror of Meta's encoder, stored in bfloat16, the precision Idol uses. Its publisher reports identical bfloat16 tensors and outputs to the upstream checkpoint; that equivalence has not been independently compared against the gated original here. The original DINOv3 license and attribution are retained in `models/dinov3/LICENSE` and `NOTICE`. Expected mirror weight SHA-256: `34252ee11eeebf00d50c528d53d725672f03ad88ff30cb724ddf3920bf67dc4c`.
+The DINOv3 encoder comes from a community bfloat16 mirror. Its expected weight SHA-256 is `34252ee11eeebf00d50c528d53d725672f03ad88ff30cb724ddf3920bf67dc4c`. The FLUX.2 download is limited to the compatible VAE and accompanying documentation. The downloader retains model cards and available license files, including the original DINOv3 license and notice. [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-The VAE comes from Black Forest Labs' public Apache-2.0 Klein release. The [Idol SDK documents](https://github.com/speridlabs/idol-sdk#python-api) using a compatible FLUX.2 autoencoder from Klein through `image_encoders`. This downloads the VAE, not the full Klein image-generation model. Model cards and available license files are kept with each download.
+## Development
 
-## Usage and files
-
-- Use **Real photograph** for photos, or **Render / AI-generated image** for synthetic inputs. A single object works best.
-- The default is 50 steps, 262,144 Gaussians, guidance 3, time shift 3, and seed 42. For a quicker first test, try 10 steps and 65,536 Gaussians.
-- Generation reports loading, background removal, image analysis, live sampling steps, Gaussian decoding, saving, and preview preparation. The ETA starts as a rough estimate and updates using completed GPU steps; successful runs calibrate stage estimates in `outputs/.timings.json`. Download time and browser preview time do not have a GPU-based ETA.
-- **Download video** records one full turn of the current preview, from the current view, in the browser (MP4 where the browser can encode it, otherwise WebM; 8 seconds at 30 fps at the preview's size). Nothing is sent to the server; the view returns to where it was. A browser that draws the preview slower than 30 fps takes longer to record, and its video turns more slowly.
-- Drag the preview to orbit, use the wheel to zoom, and right-drag to pan. Preview requires WebGL2; a PLY download remains available if preview fails.
-- Uploads accept PNG, JPEG, or WebP, up to 20 MB / 25 megapixels. EXIF orientation is corrected and oversized inputs are scaled to a maximum side of 2048 pixels before inference.
-- Inputs and results are saved in `outputs/<job-id>/`. Delete folders there to reclaim space when the app is idle. Completed job metadata is saved in `job.json` so its status can be read after a restart. An interrupted generation cannot be resumed.
-- Binding to `127.0.0.1` keeps the app local. It has no accounts and is intended for personal use.
-
-Optimization with `torch.compile` is off by default to avoid a long compilation on the first trial and reduce GPU memory pressure. Set `IDOL_OPTIMIZE=1 ./run.sh` to enable the SDK's optimized sampling path.
-
-## Development and checks
-
-```bash
+```sh
 make bootstrap
 make check
 make doctor
 ```
 
-Bootstrap uses a separate `.venv-check` with CPU PyTorch and installs Chromium. The CUDA environment stays in `.venv`. Tests do not download model weights. CI checks code, frontend build, real Chromium acceptance with synthetic data, documentation, and committed-history security.
-
-See [getting started](docs/getting-started.md), [development](docs/development.md), [validation](docs/validation.md), and the [documentation index](docs/README.md). Follow [AGENTS.md](AGENTS.md) for issue ownership, planning, TDD, worktrees, risk-based checks, PR integration, and release authorization. The [mesh stage](docs/mesh-generation.md) is implemented; the broader [Game Character roadmap](docs/game-character-plan.md) includes experimental rigging and remaining engine/animation work.
-
-The tests cover upload validation, concurrent request rejection, generation failures, downloadable artifacts, public-model setup, saved job status, adaptive ETA timing, and guided/unguided sampling step counts. CPU substitutes do not validate model quality. Real-GPU validation is deliberate and uses the [hardware protocol](docs/validation.md#real-gpu-protocol).
-
-An additional real GPU check succeeded on this machine's RTX 3060: the official backpack example, synthetic mode, 10 steps, seed 42, and 262,144 Gaussians. With progress tracking, total request time including initial model loading was 38.6 seconds. All 10 sampling steps and all six server stages were recorded; ETA updates were observed through completion. The PLY was byte-identical to the baseline generated before progress instrumentation. The DINOv3 weight file's SHA-256 was independently checked against the mirror publisher's value above.
-
-For experimental skeleton prediction, skinning and GLB/FBX/Blender exports after mesh inspection, see [automatic rigging](docs/automatic-rigging.md). Install with `make setup-rig rig-models`.
-
-The [splat-derived mesh results](docs/splat-mesh-results.md) document the fidelity experiment behind the integrated default mesh method. See the [integration plan](docs/splat-mesh-integration.md) and [integration validation](docs/splat-mesh-integration-validation.md).
-
-### Experimental canine walking
-
-Reviewed canine rigs can now create separate four-beat walking jobs, with paw review, progress/ETA, playback controls, and GLB/FBX/Blender downloads. Both in-place and forward clips are included. See [setup, usage and current limits](docs/canine-walking.md). Generic rigs and game-engine acceptance remain separate work.
+Bootstrap installs a separate CPU test environment in `.venv-check`, Chromium and the frontend dependencies. Tests use synthetic fixtures and run without model weights. CI checks Python, frontend build, browser behavior, documentation and repository security. Hardware validation is documented separately. [Development guide](docs/development.md) · [Validation](docs/validation.md) · [Contributing](CONTRIBUTING.md) · [Documentation index](docs/README.md)
