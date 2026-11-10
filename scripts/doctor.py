@@ -21,13 +21,14 @@ def main():
               'node': shutil.which('node') is not None, 'uv': shutil.which('uv') is not None,
               'frontend_built': (root / 'dist/index.html').is_file(),
               'idol_installed': find_spec('idol') is not None, 'models_ready': models_ready(),
-              'disk_free_gib': round(shutil.disk_usage(root).free / 2**30, 1), 'cuda': False}
+              'disk_free_gib': round(shutil.disk_usage(root).free / 2**30, 1), 'cuda': False, 'mps': False}
     if find_spec('torch'):
         import torch
         report['torch'] = torch.__version__
         report['cuda'] = torch.cuda.is_available()
         if report['cuda']:
             report['gpu'] = torch.cuda.get_device_name(0)
+        report['mps'] = torch.backends.mps.is_available()
     if shutil.which('nvidia-smi'):
         result = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total,memory.used,driver_version',
                                  '--format=csv,noheader'], capture_output=True, text=True)
@@ -40,7 +41,8 @@ def main():
     from splat_mesh_setup import models_ready as stereo_ready
     report['splat_mesh'] = {'environment_installed': stereo_installed(), 'models_ready': stereo_ready(),
                             'idol_environment_installed': child_idol_installed()}
-    report['generation_ready'] = all(report[key] for key in ('cuda', 'idol_installed', 'models_ready', 'frontend_built'))
+    report['generation_ready'] = (report['cuda'] or report['mps']) and all(
+        report[key] for key in ('idol_installed', 'models_ready', 'frontend_built'))
     report['next_step'] = 'make run' if report['generation_ready'] else 'For generation: make setup-local models; npm run build. See docs/getting-started.md.'
     print(json.dumps(report, indent=2))
     return int(args.require_gpu and not report['generation_ready'])

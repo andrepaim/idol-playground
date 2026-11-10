@@ -12,7 +12,7 @@ Paçoca, reconstructed from a single photograph and rotated in the local app.
 
 ## Run locally
 
-Requires Python 3.11–3.13, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ (or 22.12+), and an NVIDIA CUDA GPU. The model card reports approximately 7.2 GB peak VRAM at default settings. This machine's RTX 3060 has 12 GB; other GPU applications also consume VRAM.
+Requires Python 3.11–3.13, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ (or 22.12+), and an NVIDIA CUDA GPU or an Apple Silicon Mac. The model card reports approximately 7.2 GB peak VRAM at default settings. This machine's RTX 3060 has 12 GB; other GPU applications also consume VRAM.
 
 ```bash
 git clone https://github.com/andrepaim/idol-playground.git
@@ -31,7 +31,7 @@ uv run --no-sync python model_setup.py
 
 Open **http://127.0.0.1:8000**. If you skip the explicit download command, the first generation downloads the missing files automatically. Once downloaded, the app loads all model components from local directories.
 
-Weights and encoders total about 5 GB. Model loading takes longer than subsequent requests. Idol stays in memory between splat requests and unloads before mesh generation. Requests run one at a time. CUDA must be available to PyTorch; the app does not fall back to slow CPU inference. This uses the upstream SDK pinned to commit `8db700349a5570aac390e4780fa32e3eed6b587a`.
+Weights and encoders total about 5 GB. Model loading takes longer than subsequent requests. Idol stays in memory between splat requests and unloads before mesh generation. Requests run one at a time. CUDA or Apple Silicon MPS must be available to PyTorch; the app does not fall back to slow CPU inference. On a Mac, splat generation runs eagerly (the SDK's optimized sampling path is CUDA-only); polygon meshes and rigging still require CUDA. This uses the upstream SDK pinned to commit `8db700349a5570aac390e4780fa32e3eed6b587a`.
 
 ## Polygon meshes
 
