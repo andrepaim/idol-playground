@@ -1,6 +1,6 @@
 # Automatic rigging implementation
 
-Authorized continuation of the photo → mesh → cleanup → rig approach. Build on merged textured mesh support (PR #17). Issue #5; parent feasibility #2 remains open until the full benchmark criteria are met.
+Status: implemented and tested on the RTX 3060; PR #18 awaits final switching acceptance and merge. See [validation evidence](rig-validation.md). Authorized continuation of the photo → mesh → cleanup → rig approach. Build on merged textured mesh support (PR #17). Issue #5; parent feasibility #2 remains open until the full benchmark criteria are met.
 
 ## Behavior and acceptance
 

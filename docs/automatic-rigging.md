@@ -46,3 +46,5 @@ Automatic rigging does not repair missing/fused limbs, infer correct game topolo
 | OPT architecture configuration only | facebook/opt-350m | `08ab08cc4b72ff5593870b5d527cf4230323703c` |
 
 No separate OPT language-model weights are needed; trained parameters are included in the rigging checkpoint. See [third-party notices](../THIRD_PARTY_NOTICES.md).
+
+See [local rigging validation](rig-validation.md) for actual settings, timings and material/quality limits.
