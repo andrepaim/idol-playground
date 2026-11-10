@@ -70,3 +70,5 @@ CPU/API tests exercise missing setup, settings, exclusive-job handling, cache re
 | U2Net | rembg release v0.0.0 | Published MD5 `60024c5c889badc19c04ad937298a77b` |
 
 The DINO encoder weights are included in the reconstruction checkpoint; no second encoder-weight download is needed. The backend loads local assets with Hugging Face offline mode, and initializes the checkpoint with `weights_only=True`. Third-party source/license material remains alongside the ignored downloads. See [notices](../THIRD_PARTY_NOTICES.md).
+
+See [local validation evidence](mesh-validation.md) for tested settings, hardware observations and quality limits.
