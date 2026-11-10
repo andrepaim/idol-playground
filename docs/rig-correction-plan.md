@@ -1,0 +1,9 @@
+# Rig correction before walking
+
+Continue the failed standing gate in issue #26. The current adapter transfers four weights from the nearest inferred mesh vertex to every final vertex. Audit whether this creates discontinuities on the dense splat-derived surface; test continuous closest-triangle barycentric transfer with exact bone-name alignment before changing anatomy or replacing the accepted mesh.
+
+1. Extract source skin FBX and target GLB geometry, joints and weights in Blender. Establish/validate a similarity alignment from matching joints; preserve source identity, bone lengths, geometry, appearance and original files. Record nearest-surface distances and reject inconsistent alignment.
+2. Write failing tests for barycentric interpolation, shared-edge continuity, invalid triangles, normalization/four-influence handling and rigid alignment. Implement only supported, bounded behavior. The initial experiment may use the installed stereo environment's Open3D surface queries, keeping dependency changes isolated.
+3. Create separate corrected rig candidates, reimport exports, repeat the exact existing standing mapping and compare edge deformation and visible belly/hind-leg shape. Separate improved transfer from residual joint/pose errors. Do not treat reduced metrics alone as natural-animation acceptance.
+4. If correction passes standing review, proceed through the existing walking plan: mapped motion, contact IK, loop/root variants and native/browser export checks. Otherwise investigate residual placement/weights with concrete new evidence; preserve the parent gate.
+5. Before integrating any accepted correction, validate source/setup/failure compatibility, texture and vertex-color exports, native rerig/export paths and relevant GPU behavior for changed inference. Use PR/current-main integration and combined CI. Keep owner media, raw motion, candidate rigs and mappings local. No release or asset publication.
