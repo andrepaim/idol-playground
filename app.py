@@ -299,7 +299,7 @@ def create_rig(source_id: str):
     source_job = get_job(source_id)
     source = OUTPUTS/source_id/'object.glb'
     if source_job.get('output_type') != 'mesh' or source_job['state'] != 'complete' or not source.is_file():
-        raise HTTPException(409,'Complete a textured mesh generation before automatic rigging.')
+        raise HTTPException(409,'Complete a mesh generation before automatic rigging.')
     if not rig_backend_installed() or not rig_models_ready():
         raise HTTPException(503,'Rigging setup is incomplete. Run make setup-rig rig-models.')
     seed = source_job.get('settings',{}).get('seed',42)
@@ -401,7 +401,7 @@ async def create_job(
 
 
 @app.get('/api/jobs')
-def recent_jobs(limit: int = Query(20,ge=1,le=50)):
+def recent_jobs(limit: int = Query(50,ge=1,le=50)):
     with lock:
         snapshots = {key:dict(value) for key,value in jobs.items()}
     for folder in OUTPUTS.iterdir():

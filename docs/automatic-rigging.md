@@ -1,6 +1,6 @@
 # Experimental automatic rigging
 
-Generate a **Textured mesh · .glb**, inspect its anatomy, then click **Auto rig · experimental**. The app runs UniRig's learned skeleton prediction and skinning sequentially on the local GPU and merges the result into the original textured mesh. It preserves the static mesh as a separate job.
+Generate a **3D mesh · .glb**, inspect its anatomy, then click **Auto rig · experimental**. The app runs UniRig's learned skeleton prediction and skinning sequentially on the local GPU and merges the result into the original colored mesh. It preserves the static mesh as a separate job.
 
 ## Setup
 
@@ -22,8 +22,8 @@ The completed viewer offers **Skeleton**, **Test bend**, wireframe and reset con
 
 Downloads:
 
-- `rigged.glb`: embedded texture, skin, skeleton and diagnostic animation.
-- `rigged.fbx`: skeleton, weights, embedded texture and diagnostic animation.
+- `rigged.glb`: embedded texture or vertex colors, skin, skeleton and diagnostic animation.
+- `rigged.fbx`: skeleton, weights, source texture or color attribute, and diagnostic animation. Vertex-colored FBX may need an engine material that reads the color attribute.
 - `character.blend`: editable mesh, armature, material and diagnostic action with packed images.
 - Original static mesh: preserved without a skeleton or animation.
 
@@ -33,7 +33,7 @@ The job also retains `rig.json` with actual bone/triangle counts, peak PyTorch a
 
 The pipeline rejects missing/uncompleted source meshes and incomplete setup. Workers have per-phase timeouts, propagate errors, verify expected files, and run without upstream shell wrappers. This WSL build's Blender module can crash during interpreter teardown; the phase adapter flushes and exits only after explicit operation/result checks, while exceptions remain nonzero failures.
 
-Completed GLBs must contain finite geometry/UVs, embedded textures, a valid acyclic joint hierarchy, finite nonsingular inverse-bind matrices and normalized nonnegative weights with at most four influences per vertex. A diagnostic rotation must move weighted vertices. All three exports are independently reimported and checked for bones, binding, normalized weights and readable material textures. Unit/API tests cover invalid rigs, source/setup/busy handling, persistence, failed phases and ETA; browser acceptance covers skeleton/playback/export controls and viewer switching. Actual GPU and visual acceptance is additionally required for changed inference paths.
+Completed GLBs must contain finite geometry and either valid vertex colors or UVs with embedded textures, a valid acyclic joint hierarchy, finite nonsingular inverse-bind matrices and normalized nonnegative weights with at most four influences per vertex. A diagnostic rotation must move weighted vertices. All three exports are independently reimported and checked for bones, binding, normalized weights and readable material textures or preserved color attributes. Vertex-color reimports also compare linear mean color within a 0.02 tolerance. Unit/API tests cover invalid rigs, source/setup/busy handling, persistence, failed phases and ETA; browser acceptance covers skeleton/playback/export controls and viewer switching. Actual GPU and visual acceptance is additionally required for changed inference paths.
 
 Automatic rigging does not repair missing/fused limbs, infer correct game topology, guarantee anatomical joints, or produce standard engine humanoid bone names. The result uses generic bone names. Inspect neutral and bent poses in the viewer and Blender before engine use. Engine import/retargeting and authored animations remain separate work; see the [character roadmap](game-character-plan.md) and [implementation plan](auto-rig-implementation.md).
 

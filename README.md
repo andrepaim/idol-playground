@@ -1,6 +1,6 @@
 # Idol Playground
 
-A local image-to-3D web app: generate a Gaussian splat (`.ply`) with [Idol](https://huggingface.co/speridlabs/idol), or a textured polygon mesh (`.glb`) with [TripoSR](https://github.com/VAST-AI-Research/TripoSR). Preview the result in your browser and download it.
+A local image-to-3D web app: generate a Gaussian splat (`.ply`) with [Idol](https://huggingface.co/speridlabs/idol), or convert that splat to a vertex-colored polygon mesh (`.glb`) using calibrated stereo views, DLNR and surface fusion. [TripoSR](https://github.com/VAST-AI-Research/TripoSR) remains an optional legacy mesh method. Preview the result in your browser and download it.
 
 ## See it in action
 
@@ -33,19 +33,21 @@ Open **http://127.0.0.1:8000**. If you skip the explicit download command, the f
 
 Weights and encoders total about 5 GB. Model loading takes longer than subsequent requests. Idol stays in memory between splat requests and unloads before mesh generation. Requests run one at a time. CUDA must be available to PyTorch; the app does not fall back to slow CPU inference. This uses the upstream SDK pinned to commit `8db700349a5570aac390e4780fa32e3eed6b587a`.
 
-## Textured meshes
+## Polygon meshes
 
-Add the mesh backend to an existing installation:
+Add splat-derived meshing to an existing Idol installation:
 
 ```sh
-make setup-mesh mesh-models
+make setup-splat-mesh splat-mesh-models
 npm run build
 ./run.sh
 ```
 
-Choose **Textured mesh · .glb** after uploading a photo. Set a triangle budget and texture size, then inspect the result with orbit, wireframe, and reset controls. The GLB embeds its texture. Mesh jobs report progress/ETA and can be cancelled.
+Choose **3D mesh · .glb**, with **From Idol splat · preferred**, to generate a splat and reconstruct its surface. To reuse a completed splat, select it from saved results and click **Create mesh from this splat**. This skips Idol inference and preserves the original job. Progress includes rendered images, stereo pairs, stages and an adaptive ETA; mesh jobs can be cancelled.
 
-The mesh backend has its own pinned Python/CUDA environment. Starting it releases cached Idol tensors, and the worker exits after each job. Meshes are currently unrigged prototypes; inspect anatomy before animation. See [mesh setup, settings, limitations and validation](docs/mesh-generation.md), including a mesh-only setup path.
+The GLB stores vertex colors. It preserves the reviewed splat's shape better than the independent TripoSR reconstruction in the tested dog example, but remains a dense, unrigged prototype with possible holes. View capture can take several minutes with software WebGL. Inspect geometry before using experimental rigging.
+
+The stereo backend has its own locked Python/CUDA environment. Workers exit after each job and share the app's single-job slot. TripoSR remains available through `make setup-mesh mesh-models` and the legacy method selector. See [mesh setup, settings, API compatibility and limitations](docs/mesh-generation.md).
 
 ## Idol model sources
 
@@ -91,4 +93,4 @@ An additional real GPU check succeeded on this machine's RTX 3060: the official 
 
 For experimental skeleton prediction, skinning and GLB/FBX/Blender exports after mesh inspection, see [automatic rigging](docs/automatic-rigging.md). Install with `make setup-rig rig-models`.
 
-An optional [splat-derived mesh experiment](docs/splat-mesh-results.md) tests preserving the existing Idol result using rendered stereo views and surface fusion. It is separate from the current TripoSR mesh option.
+The [splat-derived mesh results](docs/splat-mesh-results.md) document the fidelity experiment behind the integrated default mesh method. See the [integration plan](docs/splat-mesh-integration.md) and [integration validation](docs/splat-mesh-integration-validation.md).

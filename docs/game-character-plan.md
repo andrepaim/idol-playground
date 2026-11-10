@@ -2,11 +2,11 @@
 
 Status: experimental MVP implemented. PR #17 adds textured mesh generation; PR #18 adds local skeleton prediction, skinning, diagnostic bend preview and GLB/FBX/Blender exports. Geometry-quality refinement, engine import/retargeting and authored animations remain future work. See [mesh generation](mesh-generation.md), [automatic rigging](automatic-rigging.md) and [actual validation](rig-validation.md).
 
-Quality feedback: the TripoSR dog reconstruction did not meet the owner's fidelity requirement. A [splat-derived mesh experiment](splat-mesh-results.md) now preserves the saved Idol dog's outline substantially better; it remains outside the app's generation modes pending broader review.
+Quality feedback: the TripoSR dog reconstruction did not meet the owner's fidelity requirement. A [splat-derived mesh experiment](splat-mesh-results.md) now preserves the saved Idol dog's outline substantially better; it is now the app's preferred mesh method after owner review.
 
-The current UI exposes **Textured mesh** followed by **Auto rig · experimental**. This roadmap retains the broader **Game Character** target: useful character geometry and validated assets for a selected game engine.
+The current UI exposes **3D mesh** followed by **Auto rig · experimental**. This roadmap retains the broader **Game Character** target: useful character geometry and validated assets for a selected game engine.
 
-The implemented baseline is **TripoSR → mesh cleanup/UV baking → UniRig → Blender export and validation**. Actual tests prove sequential local execution on the NVIDIA RTX 3060 with 12 GB VRAM. Broader geometry/deformation quality acceptance remains open; individual models running successfully does not establish game-ready characters.
+The preferred implemented path is **Idol → calibrated stereo views → DLNR → surface fusion/vertex colors → UniRig → Blender export and validation**. TripoSR with UV baking remains an explicit legacy method. The detailed phases below retain the original broader roadmap; current behavior is documented in mesh generation and automatic rigging. Actual tests prove sequential local execution on the NVIDIA RTX 3060 with 12 GB VRAM. Broader geometry/deformation quality acceptance remains open; individual models running successfully does not establish game-ready characters.
 
 This plan assumes engine-neutral exports until a target engine is selected. All inference runs locally.
 

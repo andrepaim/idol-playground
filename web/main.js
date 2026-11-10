@@ -218,7 +218,7 @@ async function watchJob(id) {
       $('result-badge').textContent = rig ? 'EXPERIMENTAL CHARACTER RIG' : colored ? 'SPLAT-DERIVED MESH' : mesh ? 'TEXTURED POLYGON MESH' : '3D GAUSSIAN SPLAT';
       $('download').hidden = false;
       $('result-info').textContent = rig ? `${job.rig.bones} bones · ${Number(job.rig.triangles).toLocaleString()} triangles · ${job.seconds}s` : mesh ? `${Number(job.mesh.triangles).toLocaleString()} triangles · ${colored ? 'vertex colors' : `${job.mesh.texture_resolution}px texture`} · ${job.seconds}s` : `${Number(job.settings.num_gaussians).toLocaleString()} Gaussians · ${job.seconds}s · seed ${job.settings.seed}`;
-      showProgress({ stage: 'preview', message: mesh ? 'Opening the textured mesh preview…' : 'Downloading the PLY and preparing the interactive 3D preview…' });
+      showProgress({ stage: 'preview', message: mesh ? 'Opening the mesh preview…' : 'Downloading the PLY and preparing the interactive 3D preview…' });
       try {
         if (mesh) {
           await disposeViewer();

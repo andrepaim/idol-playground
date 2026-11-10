@@ -26,4 +26,4 @@ Open http://127.0.0.1:8000. `make setup-local` installs the CUDA SDK into `.venv
 
 The app binds to loopback. `PORT=8002 make run` selects another port. Export variables in your shell; `.env.example` is documentation and the server does not automatically load `.env`.
 
-Inputs and results live in `outputs/<job-id>`. Do not delete or move active-job directories. Completed `job.json` survives restarts; interrupted inference cannot currently resume. For textured GLB output, follow [mesh setup](mesh-generation.md). Rigging and animation are subsequent work.
+Inputs and results live in `outputs/<job-id>`. Do not delete or move active-job directories. Completed `job.json` survives restarts; interrupted inference cannot currently resume. For splat-derived GLB output, run `make setup-splat-mesh splat-mesh-models` and follow [mesh setup](mesh-generation.md). Optional [automatic rigging](automatic-rigging.md) is available after mesh inspection; authored animation and engine acceptance remain separate work.

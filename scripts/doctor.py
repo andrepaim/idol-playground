@@ -36,6 +36,10 @@ def main():
     from rig_runtime import backend_installed as rig_installed
     from rig_setup import models_ready as rig_ready
     report['rig'] = {'environment_installed': rig_installed(), 'models_ready': rig_ready()}
+    from splat_mesh_runtime import backend_installed as stereo_installed, idol_installed as child_idol_installed
+    from splat_mesh_setup import models_ready as stereo_ready
+    report['splat_mesh'] = {'environment_installed': stereo_installed(), 'models_ready': stereo_ready(),
+                            'idol_environment_installed': child_idol_installed()}
     report['generation_ready'] = all(report[key] for key in ('cuda', 'idol_installed', 'models_ready', 'frontend_built'))
     report['next_step'] = 'make run' if report['generation_ready'] else 'For generation: make setup-local models; npm run build. See docs/getting-started.md.'
     print(json.dumps(report, indent=2))

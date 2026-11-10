@@ -25,3 +25,9 @@ updates:
     directory: /backends/unirig
     schedule:
       interval: weekly
+
+  - package-ecosystem: uv
+    directory: /experiments/splat_mesh
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
