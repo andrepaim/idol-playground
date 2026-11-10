@@ -1,1 +1,16 @@
-{}
+{
+  "docs/demos/pacoca-turntable.gif": {
+    "reason": "Owner explicitly requested a public README demo using pacoca.jpg (issue #14). Reviewed the original photo and actual encoded UI capture at multiple orbit angles; only the app and requested image/result are visible, with no desktop/browser chrome, local paths, audio, or original EXIF.",
+    "source": "Actual local Idol UI recording of the owner-provided pacoca.jpg reconstruction; 50 steps, 262144 Gaussians, seed 42; generation revision a8190c0.",
+    "sha256": [
+      "0279c172226ccfd41b53e234be8066cba29adcc5601179c06ec2360680dada2e"
+    ]
+  },
+  "docs/demos/pacoca-turntable.mp4": {
+    "reason": "Owner explicitly requested a public README demo using pacoca.jpg (issue #14). Reviewed the original photo and actual encoded UI capture at multiple orbit angles; only the app and requested image/result are visible, with no desktop/browser chrome, local paths, audio, or original EXIF.",
+    "source": "Actual local Idol UI recording of the owner-provided pacoca.jpg reconstruction; 50 steps, 262144 Gaussians, seed 42; generation revision a8190c0.",
+    "sha256": [
+      "74d69e5eaa20797c8c1c9961a664b00f411e5ac5d327ae4fae0fffb2e733daf2"
+    ]
+  }
+}
