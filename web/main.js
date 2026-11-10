@@ -1,4 +1,5 @@
 import './style.css';
+import { recordTurntable, videoFormat } from './turntable.js';
 
 const $ = (id) => document.getElementById(id);
 let viewer, renderer, resizeObserver, previewUrl, busy = false, serverReady = false;
@@ -101,6 +102,7 @@ async function request(url, options) {
 function updateButton() {
   updateWalkControls();
   $('saved-result').disabled = busy;
+  $('video-download').disabled = busy;
   $('generate').disabled = busy || !serverReady || !$('image').files.length;
 }
 
@@ -147,6 +149,7 @@ async function disposeViewer() {
   meshViewer?.dispose();
   meshViewer = undefined;
   $('mesh-toolbar').hidden = true;
+  $('video-download').hidden = true;
   $('walk-playback').hidden = true;
   resizeObserver?.disconnect();
   try {
@@ -241,6 +244,7 @@ async function watchJob(id) {
           await loadViewer(file);
         }
         $('empty').hidden = true;
+        $('video-download').hidden = !videoFormat();
       } catch (error) {
         $('empty').hidden = false;
         showError(`Generation succeeded, but the 3D preview could not load. You can download the ${mesh ? 'GLB' : 'PLY'}. ${error.message}`);
@@ -348,6 +352,47 @@ async function checkStatus() {
   }
 }
 
+$('video-download').addEventListener('click', async () => {
+  const canvas = $('viewer').querySelector('canvas');
+  const orbit = meshViewer ? meshViewer.orbit : viewer && {
+    camera: viewer.camera, controls: viewer.controls, render: () => viewer.forceRenderNextFrame(),
+  };
+  if (busy || !canvas || !orbit) return;
+  const resumeWalk = !$('walk-playback').hidden && meshViewer?.state().playing;
+  if (resumeWalk) meshViewer.play(false);
+  const previewControls = [...document.querySelectorAll('#mesh-toolbar input, #mesh-toolbar button, #walk-playback input, #walk-playback button, #walk-playback select')]
+    .map((input) => ({ input, disabled: input.disabled }));
+  for (const {input} of previewControls) input.disabled = true;
+  busy = true;
+  updateButton();
+  updateRigControls();
+  updateConversionControls();
+  $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
+  $('message').hidden = true;
+  const button = $('video-download');
+  try {
+    const { blob, extension } = await recordTurntable(canvas, orbit, {
+      onProgress: (progress) => { button.textContent = `Recording… ${Math.round(progress * 100)}%`; },
+    });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `idol-turntable.${extension}`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 60000);
+  } catch (error) {
+    showError(`Could not record the video. ${error.message}`);
+  } finally {
+    button.textContent = 'Download video ↓';
+    busy = false;
+    for (const {input,disabled} of previewControls) input.disabled = disabled;
+    if (resumeWalk) meshViewer.play(true);
+    $('form').querySelectorAll('input,select').forEach((input) => { input.disabled = false; });
+    syncOutputControls();
+    updateButton();
+    updateRigControls();
+    updateConversionControls();
+  }
+});
 $('output_type').addEventListener('change', () => { syncOutputControls(); applyStatus(); });
 $('mesh_backend').addEventListener('change', () => { syncOutputControls(); applyStatus(); });
 $('wireframe').addEventListener('change', () => meshViewer?.wireframe($('wireframe').checked));
@@ -560,6 +605,7 @@ async function showWalk(job) {
     $('bend-control').hidden = true;
     $('skeleton').checked = $('wireframe').checked = false;
     $('walk-playback').hidden = false;
+    $('video-download').hidden = !videoFormat();
     $('walk-play').textContent = 'Pause';
     $('walk-floor').checked = $('walk-follow').checked = true;
     $('walk-play-speed').value = '1';

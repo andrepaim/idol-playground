@@ -136,7 +136,7 @@ export async function loadMeshViewer(container, url, options = {}) {
       dispose,
       state() {
         object.updateMatrixWorld(true);
-        return {time:action?.time,duration:action?.getClip().duration,travel:accumulated,
+        return {playing:Boolean(action?.isRunning()),time:action?.time,duration:action?.getClip().duration,travel:accumulated,
           root:rootBone?.getWorldPosition(new THREE.Vector3()).toArray(),floor:grid?.position.y,
           camera:camera.position.toArray(),target:controls.target.toArray()};
       },
@@ -150,6 +150,7 @@ export async function loadMeshViewer(container, url, options = {}) {
       highlight(name) { selectedBone = object.getObjectByName(name); marker.visible = Boolean(selectedBone); },
       hasSkeleton: Boolean(skeleton),
       hasAnimation: Boolean(action),
+      orbit: { camera, controls, render() {} },
       skeleton(enabled) { if (skeleton) skeleton.visible = enabled; },
       diagnostic(enabled) { if (action) { if (enabled) action.reset().play(); else action.stop(); } },
       reset() {
