@@ -40,8 +40,8 @@ def file_problem(path, data, approved):
         return "private/generated file type"
     if re.fullmatch(r"distillpod-\d{4}-\d{2}-\d{2}.*\.json", name):
         return "personal backup document"
-    if any(part.lower() in {"reports", "logs", "media", "screenshots", "models", "outputs", "node_modules", ".venv", ".venv-check", ".local", "dist"}
-           for part in PurePosixPath(path).parts[:-1]):
+    if any(part.lower().startswith(".venv") or part.lower() in {"reports", "logs", "media", "screenshots", "models", "outputs", "node_modules", ".venv", ".venv-check", ".local", "dist"}
+           for part in PurePosixPath(path).parts):
         return "personal capture/output directory"
     if len(data) > 8 * 1024 * 1024:
         return "file exceeds the 8 MiB repository limit"

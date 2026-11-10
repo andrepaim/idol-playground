@@ -16,7 +16,7 @@ class RepositoryDataGuardTests(unittest.TestCase):
     def test_sensitive_containers_are_blocked_without_reading_values(self):
         for path in (".env", ".env.production", "config/owner.jks", "capture.opml",
                      "debug.log", "google-services.json", "reports/result.html",
-                     "models/model.safetensors", "outputs/input.png", "mesh.glb",
+                     "models/model.safetensors", "outputs/input.png", "models", "outputs", ".venv-unirig/python", "mesh.glb",
                      "mesh.ply", "model.ckpt", "renamed.sqlite3"):
             with self.subTest(path=path):
                 self.assertIsNotNone(file_problem(path, b"synthetic fixture", {}))
