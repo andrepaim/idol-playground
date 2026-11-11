@@ -235,3 +235,31 @@ def test_pipe_setup_failure_releases_reservation(tmp_path, monkeypatch):
     retry = WorkerLease(tmp_path/'retry.json', tmp_path/'resource.lock')
     retry.start([sys.executable, '-c', 'pass'])
     assert retry.wait(timeout=5)['returncode'] == 0
+
+
+def test_exiting_worker_without_readable_environment_is_observed_without_signals(tmp_path,monkeypatch):
+    import worker_leases
+    manager=WorkerLease(tmp_path/'lease.json',tmp_path/'resource.lock')
+    ready=tmp_path/'ready';stop=tmp_path/'stop'
+    code="""from pathlib import Path
+import sys,time
+Path(sys.argv[1]).write_text('ready')
+while not Path(sys.argv[2]).exists(): time.sleep(.01)
+"""
+    manager.start([sys.executable,'-c',code,str(ready),str(stop)])
+    try:
+        wait_file(ready)
+        original=worker_leases._markers
+        def unreadable_during_exit(pid,record):
+            if pid==manager.process.pid:
+                stop.write_text('exit normally')
+                return False
+            return original(pid,record)
+        with monkeypatch.context() as patch:
+            patch.setattr(worker_leases,'_markers',unreadable_during_exit)
+            result=manager.cancel(grace=.3)
+        assert result['returncode']==0  # no TERM/KILL sent to an unverifiable process
+    finally:
+        stop.write_text('exit normally')
+        if manager.process.poll() is None:
+            manager.wait(timeout=5)
