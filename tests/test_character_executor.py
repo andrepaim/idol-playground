@@ -288,3 +288,38 @@ def test_invalid_adapter_is_rejected_before_namespace_mutation(setup):
         StageExecutor(store,resource,{'bad':bad})
     assert not (store.root/'.service.lock').exists()
     assert store.load(IDENTITY)['revision']==0
+
+
+def test_crash_during_lease_publication_never_executes_target(setup):
+    store,resource=setup
+    ready=store.root.parent/'gate-ready';forbidden=store.root.parent/'must-not-execute'
+    code='''import sys,time
+from pathlib import Path
+from hashlib import sha256
+from character_store import CharacterStore
+from character_executor import StageExecutor,Adapter
+from character_coordinator import Decision
+from worker_leases import WorkerLease
+def paused_persist(self,value):
+ Path(sys.argv[3]).write_text('gate blocked before durable lease')
+ time.sleep(600)
+WorkerLease._persist=paused_persist
+def command(ctx):
+ return [sys.executable,'-c',"from pathlib import Path;import sys;Path(sys.argv[1]).write_text('executed')",sys.argv[4]]
+service=StageExecutor(CharacterStore(sys.argv[1]),sys.argv[2],{'fixture':Adapter('input',{'adapter':'fixture-v1'},('input.png',),command,lambda _:Decision('accept',{}))})
+service.start('a'*32,'fixture',{}, {},external_inputs={'upload':sha256(b'fixture').hexdigest()})
+'''
+    parent=subprocess.Popen([sys.executable,'-c',code,str(store.root),str(resource),str(ready),str(forbidden)],cwd=Path(__file__).parents[1])
+    try:
+        deadline=time.monotonic()+5
+        while not ready.exists() and time.monotonic()<deadline: time.sleep(.02)
+        assert ready.exists()
+        parent.kill();parent.wait(timeout=5)
+        with StageExecutor(store,resource,{'fixture':adapter()}) as service:
+            assert store.load(IDENTITY)['stages']['input']['state']=='interrupted'
+            assert not forbidden.exists()
+            retry=start(service)
+            assert service.wait(retry,timeout=5)['stages']['input']['state']=='succeeded'
+            assert not forbidden.exists()
+    finally:
+        if parent.poll() is None: parent.terminate();parent.wait(timeout=5)

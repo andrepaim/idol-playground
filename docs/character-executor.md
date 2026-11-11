@@ -28,6 +28,14 @@ Corrupt records, missing attempt identity, foreign/reused PID, live parent or a 
 
 ## Validation boundary
 
-Fifteen tests use actual owned disposable subprocesses and isolated stores: success/cache, conflicting service, timeout/duplicate/cancel/retry, failed/rejected/invalid output, close cleanup, claim-before-launch crash boundary, unknown adapters, server crash, cross-store resource contention, stale completion, live-parent refusal, preserved dependencies, concurrent wait/cancel and uncertain completion. Tests first failed on the absent module; the blocking-wait cancellation regression also failed before its fix.
+Sixteen tests use actual owned disposable subprocesses and isolated stores: success/cache, conflicting service, timeout/duplicate/cancel/retry, failed/rejected/invalid output, close cleanup, claim-before-launch crash boundary, unknown adapters, server crash, cross-store resource contention, stale completion, live-parent refusal, preserved dependencies, concurrent wait/cancel and uncertain completion. Tests first failed on the absent module; the blocking-wait cancellation regression also failed before its fix.
 
 Actual RTX 3060 lifecycle acceptance of this combined layer is required before merge and recorded separately. No model inference, anatomical quality, arbitrary vendor process tree, legacy cache coordination or browser/API integration is established by these tests. Those remain later M2/M3–M10 gates.
+
+## RTX 3060 combined-layer receipt
+
+Clean tracked runtime revision `a6d2a390158ddb74874d3029f86c17fbd4e0cdec`, 2026-11-11 UTC, Linux/WSL, RTX 3060 12,288 MiB, driver 610.88, PyTorch 2.15.0+cu132/CUDA 13.2. Disposable registered workers allocated, initialized and synchronized 256 MiB. Measured PyTorch allocated/reserved were both 268,435,456 bytes, not total device use.
+
+Six scenarios passed through the combined executor: second service's worker launch excluded; cancellation committed after exit/reap; CUDA retry validated/committed; verified cache hit launched nothing; service crash recovered the worker and marked its stage interrupted; subsequent CUDA retry validated/committed. The known app was verified idle before stopping and restored ready afterward. The ignored private receipt is `.local/executor-gpu-receipt.json` in the executor worktree.
+
+Subsequent changes add a disposable crash-during-lease-publication test and documentation only; that test confirms the ungranted target never executes and a replacement service can retry. No model inference path changed. Full PR and combined-main CI remain required; author review is not independent approval.
