@@ -54,10 +54,11 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 
 | Milestone | Status |
 |---|---|
-| M0 | Partial audit/decisions; corpus and full baseline pending |
+| M0 | Partial audit/source review and development baseline; full corpus and quality accounting pending |
 | M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
-| M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership merged with successful CI; combined executor/recovery merged with successful CI; local input/review API merged with successful CI; browser workflow in validation; model integration pending |
-| M3–M10 | Planned; dependency and acceptance gates remain applicable |
+| M2 | Contracts, atomic store, artifact publication, coordinator, worker ownership, executor/recovery, local input/review API and browser workflow merged with successful combined CI; actual model/global GPU integration pending |
+| M3 | Manual preparation/review foundation merged; isolated bounded proposal contract in validation; provider/routing evaluation pending |
+| M4–M10 | Planned; dependency and acceptance gates remain applicable |
 
 A later isolated development baseline at `c804742` completed the existing Idol → stereo mesh → UniRig path on a licensed canine render. The 855,576-triangle result fails the runtime mesh budget, and its generated 32-bone rig is correctly refused by the current fixed 34-bone walking profile. See [source provenance, timings, memory and visual limitations](character-baseline.md). This demonstrates the remaining preparation/mapping work; it does not establish a playable new image or complete M0.
 
@@ -140,3 +141,9 @@ The combined executor reached main at `75e784c` with successful full combined CI
 A separate character page connects the opt-in API to real image/manual-review controls, saved-character selection, crop confirmation, status, cancellation/retry and verified downloads. Validated URL identity reconnects after refresh without submitting work. Delayed reports wait before enabling edits; delayed status cannot regress newer displayed revisions. Local preview URLs are disposed and the page uses local assets/API only. See [workflow behavior and validation limits](character-workflow.md).
 
 The API reached main at `e5b720a` with successful full combined CI `43075985489`. The browser workflow is a preparation/review foundation; model adapters, reasoning evaluation and corpus/quality gates remain unaccepted. 3D/playable stages are explicitly unavailable in this new workflow.
+
+The browser workflow subsequently reached main at `e6ab907` with successful combined CI `43081279947`, including isolated real-API browser acceptance and read-only compatibility checks of the owner's saved canine.
+
+## M3 bounded proposal contract
+
+An isolated [reasoning contract](anatomy-reasoning.md) adds metadata-stripped image views, closed typed proposals, supplied-view evidence checks, explicit manual fallback and call/byte/deadline limits. Every proposal requires review. Timeout/caller cancellation retains an active-call guard until completion; bounded close reports unfinished cancellation. No provider, external request, API/UI integration or automatic anatomical acceptance is enabled. Fake-provider and image/parser tests validate the boundary; actual routing accuracy and provider cost remain untested.
