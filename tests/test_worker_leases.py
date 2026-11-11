@@ -223,3 +223,15 @@ def test_recovery_cannot_report_completion_while_resource_still_owned(tmp_path):
         assert json.loads((tmp_path/'lease.json').read_text())['state'] == 'exited'
     finally:
         os.close(descriptor)
+
+
+def test_pipe_setup_failure_releases_reservation(tmp_path, monkeypatch):
+    import worker_leases
+    manager = WorkerLease(tmp_path/'failed.json', tmp_path/'resource.lock')
+    with monkeypatch.context() as patch:
+        patch.setattr(worker_leases.os, 'pipe', lambda: (_ for _ in ()).throw(OSError('Injected descriptor exhaustion')))
+        with pytest.raises(OSError):
+            manager.start([sys.executable, '-c', 'pass'])
+    retry = WorkerLease(tmp_path/'retry.json', tmp_path/'resource.lock')
+    retry.start([sys.executable, '-c', 'pass'])
+    assert retry.wait(timeout=5)['returncode'] == 0

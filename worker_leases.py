@@ -149,6 +149,9 @@ class WorkerLease:
             raise ValueError('Each attempt needs a new lease identity.')
         if not isinstance(command, (list, tuple)) or not command or not all(isinstance(value, str) and '\0' not in value for value in command):
             raise ValueError('Use a registered argv command, never a shell string.')
+        environment = dict(os.environ if env is None else env)
+        self._nonce = uuid4().hex
+        environment.update(IDOL_LEASE_NONCE=self._nonce, IDOL_LEASE_NAMESPACE=self.namespace)
         self._fd = os.open(self.resource, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
         if not stat.S_ISREG(os.fstat(self._fd).st_mode):
             self._close_resource()
@@ -161,10 +164,12 @@ class WorkerLease:
         except OSError:
             self._close_resource()
             raise
-        read_gate, write_gate = os.pipe()
-        self._nonce = uuid4().hex
-        environment = {**(os.environ if env is None else env), 'IDOL_LEASE_NONCE':self._nonce,
-                       'IDOL_LEASE_NAMESPACE':self.namespace, 'IDOL_RESOURCE_FD':str(self._fd)}
+        try:
+            read_gate, write_gate = os.pipe()
+        except OSError:
+            self._close_resource()
+            raise
+        environment['IDOL_RESOURCE_FD'] = str(self._fd)
         try:
             with _private_log(self.path.with_suffix('.stdout.log')) as stdout, _private_log(self.path.with_suffix('.stderr.log')) as stderr:
                 self.process = subprocess.Popen([sys.executable, '-I', '-S', str(Path(__file__).parent/'scripts/worker_gate.py'),
