@@ -599,3 +599,71 @@ def test_play_scene_rejects_invalid_source_and_wrong_animation(site):
         expect(page.locator('#play-status')).to_contain_text('Walk_inplace')
         expect(page.locator('#play-view canvas')).to_have_count(0)
         browser.close()
+
+
+def test_exported_sample_runs_without_authoring_backend(tmp_path):
+    from zipfile import ZipFile
+    import shutil
+    from playable_package import build_package
+
+    root = Path(__file__).resolve().parents[2]
+    source = tmp_path / 'source'
+    source.mkdir()
+    (source / 'walk-inplace.glb').write_bytes(inplace_bytes())
+    job = {'state': 'complete', 'output_type': 'walk', 'walk': {'profile': 'canine-34-v1', 'stride': .16}}
+    folder = tmp_path / 'sample'
+    with ZipFile(BytesIO(build_package(source, job, root))) as archive:
+        archive.extractall(folder)
+    # Dependency installation is validated separately. Reuse the already locked
+    # installed Three.js package here so ordinary browser tests never download.
+    shutil.copytree(root / 'node_modules' / 'three', folder / 'node_modules' / 'three')
+    class Handler(SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(folder), **kwargs)
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(args=['--no-sandbox', '--enable-unsafe-swiftshader'])
+            page = browser.new_page()
+            errors, requests = [], []
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.on('request', lambda request: requests.append(request.url))
+            origin = f'http://127.0.0.1:{server.server_port}'
+            page.goto(origin)
+            expect(page.locator('#status')).to_contain_text('Ready')
+            page.locator('canvas').click()
+            page.keyboard.down('ArrowUp')
+            page.wait_for_timeout(500)
+            page.keyboard.up('ArrowUp')
+            assert abs(float(page.locator('#play-view').get_attribute('data-z'))) > .02
+            page.locator('#reset').click()
+            assert float(page.locator('#play-view').get_attribute('data-z')) == 0
+            lifecycle = page.evaluate('''async () => {
+                const {loadPlayable} = await import('/playable-viewer.js');
+                const results = [];
+                for (let i = 0; i < 10; i++) {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'width:300px;height:200px'; document.body.append(div);
+                    const viewer = await loadPlayable(div, '/character.glb', {stride:.16});
+                    await new Promise(requestAnimationFrame);
+                    const canvas = div.querySelector('canvas'), gl = canvas.getContext('webgl2');
+                    viewer.dispose(); viewer.dispose();
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                    results.push(div.querySelectorAll('canvas').length === 0 && gl.isContextLost());
+                    div.remove();
+                }
+                return results;
+            }''')
+            assert lifecycle == [True] * 10
+            assert not errors
+            assert all((url.startswith(origin + '/') or url.startswith('blob:' + origin + '/')) and '/api/' not in url for url in requests), requests
+            page.route('**/character.json', lambda route: route.fulfill(json={'schema_version': 1, 'profile': 'canine-34-v1', 'geometry': {'file': 'character.glb', 'sha256': '0' * 64}, 'motion': {'mode': 'inplace', 'stride': .16}}))
+            page.reload()
+            expect(page.locator('#status')).to_contain_text('SHA-256')
+            browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()

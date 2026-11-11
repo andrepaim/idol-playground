@@ -593,6 +593,8 @@ async function showWalk(job) {
   $('walk-exports').hidden = false;
   const playable = job.walk.profile === 'canine-34-v1' && Boolean(job.files['walk-inplace.glb']);
   $('play-canine').hidden = !playable;
+  $('playable-sample').hidden = !playable;
+  if (playable) $('playable-sample').href = `/api/jobs/${job.id}/playable-sample`;
   if (playable) $('play-canine').href = '/play.html?' + new URLSearchParams({model:job.files['walk-inplace.glb'],profile:job.walk.profile,stride:String(job.walk.stride)});
   showProgress({stage:'preview',message:'Opening the walking preview…'});
   try {

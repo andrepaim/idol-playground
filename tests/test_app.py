@@ -194,3 +194,31 @@ def test_public_model_setup_does_not_require_hugging_face_login(monkeypatch):
     assert response.status_code == 200
     assert response.json()["ready"] is True
     assert response.json()["weights_downloaded"] is True
+
+
+def test_playable_sample_api_validates_identity_and_returns_download(client, monkeypatch):
+    job_id = 'a' * 32
+    server.jobs[job_id] = {'state': 'complete', 'output_type': 'walk'}
+    calls = []
+    def package(folder, job, root):
+        calls.append((folder, job))
+        return b'portable ZIP'
+    monkeypatch.setattr(server, 'build_playable_package', package, raising=False)
+    response = client.get(f'/api/jobs/{job_id}/playable-sample')
+    assert response.status_code == 200
+    assert response.content == b'portable ZIP'
+    assert response.headers['content-type'] == 'application/zip'
+    assert 'attachment' in response.headers['content-disposition']
+    assert calls[0][0] == server.OUTPUTS / job_id
+    assert client.get('/api/jobs/not-a-job/playable-sample').status_code == 404
+
+
+def test_playable_sample_api_reports_ineligible_job(client, monkeypatch):
+    job_id = 'b' * 32
+    server.jobs[job_id] = {'state': 'complete', 'output_type': 'mesh'}
+    def reject(*args):
+        raise ValueError('A completed reviewed canine walk is required.')
+    monkeypatch.setattr(server, 'build_playable_package', reject, raising=False)
+    response = client.get(f'/api/jobs/{job_id}/playable-sample')
+    assert response.status_code == 422
+    assert 'canine' in response.json()['detail']
