@@ -16,3 +16,11 @@ The set has 18 PNGs: biped/quadruped/swimmer × drawing/render × three paramete
 The manifest records source hashes, base Git revision/dirty status, Python/Pillow/Three/Chromium versions, actual renderer, dimensions, asset hashes and limitations. Forced SwiftShader supports local software rendering; it supplies no CUDA or hardware-performance evidence. `review.html` provides a contact-sheet view for visual inspection. No raster/model output is committed or distributed by this tooling.
 
 Generation is visual/exploratory work: concrete acceptance consists of a real new export, PNG dimensions and hashes, parsable self-contained GLBs, inspected silhouettes and no-overwrite behavior preserving an existing manifest hash. A test that merely repeats drawing coordinates would add no useful evidence. Relevant repository checks and combined CI still apply. This increment preserves the separate corpus acquisition, source/license review, split freeze and actual RTX 3060 stage-baseline work in M0.
+
+## Tooling receipt
+
+Clean combined source revision `dab3d7f25475cb43c6531cb01d4e923ddf8e566a`, 2026-11-11 UTC: 18 actual 512×512 PNG exports and nine self-contained binary glTF 2 files passed source/image hash, dimensions, framed nonempty silhouette and embedded-resource checks. The contact sheet was inspected: complete framed bodies are visible. Python 3.11.15, Pillow 12.3.0, Three.js 0.187.0, Chromium 158.0.8127.18, forced SwiftShader. No inference or owner inputs were used.
+
+Rerunning against the same directory failed with `FileExistsError` and preserved manifest SHA-256 `909def80c10fc1cf2b86a2262b91d2b79bfeec7534705c91dec115350e789683`. An unsafe output name was refused. Receipt and exports remain ignored in the corpus worktree. Repository lint/docs/whitespace, 177 Python tests, 33 infrastructure tests and seven controller tests pass. PR/combined CI remain required.
+
+The independent corpus is still incomplete. Acquiring separately licensed assets does not make these close procedural variants independent subjects, and a static GLB is not an accepted authored rig. M0 remains open for provenance/split, actual stage measurements and quality assessment.
