@@ -33,3 +33,5 @@
 - [Playable implementation progress](playable-progress.md): decisions, baseline evidence, blockers and milestone status.
 
 - [Character storage foundation](character-storage.md): private stage contracts, atomic revisions, integrity checks and integration limits.
+
+- [Character coordinator foundation](character-coordinator.md): claims, named inputs, validation decisions, cache/retry rules and integration limits.
