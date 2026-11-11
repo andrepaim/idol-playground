@@ -34,8 +34,10 @@ Actual RTX 3060 lifecycle acceptance of this combined layer is required before m
 
 ## RTX 3060 combined-layer receipt
 
-Clean tracked runtime revision `a6d2a390158ddb74874d3029f86c17fbd4e0cdec`, 2026-11-11 UTC, Linux/WSL, RTX 3060 12,288 MiB, driver 610.88, PyTorch 2.15.0+cu132/CUDA 13.2. Disposable registered workers allocated, initialized and synchronized 256 MiB. Measured PyTorch allocated/reserved were both 268,435,456 bytes, not total device use.
+Clean tracked runtime revision `656fb910983992fe5defc68950b32f2dd115618c`, 2026-11-11 UTC, Linux/WSL, RTX 3060 12,288 MiB, driver 610.88, PyTorch 2.15.0+cu132/CUDA 13.2. Disposable registered workers allocated, initialized and synchronized 256 MiB. Measured PyTorch allocated/reserved were both 268,435,456 bytes, not total device use.
 
 Six scenarios passed through the combined executor: second service's worker launch excluded; cancellation committed after exit/reap; CUDA retry validated/committed; verified cache hit launched nothing; service crash recovered the worker and marked its stage interrupted; subsequent CUDA retry validated/committed. The known app was verified idle before stopping and restored ready afterward. The ignored private receipt is `.local/executor-gpu-receipt.json` in the executor worktree.
 
-Subsequent changes add a disposable crash-during-lease-publication test and documentation only; that test confirms the ungranted target never executes and a replacement service can retry. No model inference path changed. Full PR and combined-main CI remain required; author review is not independent approval.
+The disposable crash-during-lease-publication test confirms the ungranted target never executes and a replacement service can retry. No model inference path changed. Full PR and combined-main CI remain required; author review is not independent approval.
+
+The final runtime revision above also reran all five primitive CUDA lifecycle scenarios after the CI-discovered environment-read exit race was fixed. Both complete hardware runs passed with clean tracked files.
