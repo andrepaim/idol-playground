@@ -56,7 +56,7 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 |---|---|
 | M0 | Partial audit/decisions; corpus and full baseline pending |
 | M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
-| M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership in validation; process integration/recovery/API pending |
+| M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership merged with successful CI; combined executor/recovery in validation; API pending |
 | M3–M10 | Planned; dependency and acceptance gates remain applicable |
 
 ## M1 controller foundation
@@ -97,7 +97,7 @@ The opt-in store retains content-addressed revisions and atomically publishes a 
 
 Eight isolated filesystem/process tests and all 95 Python tests pass locally. Previous revisions and orphaned publications are preserved. This increment is not connected to the app and does not implement artifact publication, GPU ownership, recovery or resume; those remain M2 work. See [storage details](character-storage.md).
 
-M1 implementation reached main at `cd2f2e0`, with successful combined CI run `43031731151`. Contracts reached main at `434d7f2`, with successful combined CI run `43032877371`. The local app was refreshed while idle, retains all existing outputs/models, and serves the play page and sample endpoint. Neither result completes the M0 corpus/model-quality baseline or later product tiers.
+M1 implementation reached main at `cd2f2e0`, with successful combined CI run `43031720372`. Contracts reached main at `434d7f2`; that revision's CI was cancelled. Full combined CI later passed with the contracts included at `7307cfd` (run `43041650418`). The local app was refreshed while idle, retains all existing outputs/models, and serves the play page and sample endpoint. Neither result completes the M0 corpus/model-quality baseline or later product tiers.
 
 ## M2 immutable artifact publication increment
 
@@ -113,10 +113,16 @@ The coordinator claims stages using verified named dependencies and canonical in
 
 Eighteen new transition tests and all126 Python/33 infrastructure tests pass locally. `CommitUncertain` propagates for reconciliation instead of being overwritten with a blind failure. No process, GPU or API integration is claimed. See [coordinator details](character-coordinator.md).
 
-Artifact publication reached main at `11d24a0`, with successful combined CI `43046232723`. M0 corpus/model-quality baseline and M2 ownership/recovery/API work remain incomplete.
+Artifact publication reached main at `11d24a0`, with successful combined CI `43046217270`. M0 corpus/model-quality baseline and M2 ownership/recovery/API work remain incomplete.
 
 ## M2 cooperating worker ownership increment
 
 An unexposed Linux/WSL worker primitive durably records process identities before granting execution, holds an inherited resource lock, stops verified workers through pidfds and reconciles parent death conservatively. It refuses live-parent takeover and foreign/reused identities. Twelve disposable subprocess tests pass, including a red/green regression for Python startup hooks before grant and private log permissions. See [worker protocol and limits](worker-leases.md).
 
-The coordinator reached main at `3db7849`, with successful combined CI `43049893975`. Existing model launchers, caches and API remain unchanged; model-specific adapters and actual inference/cancellation checks remain required. This ownership increment is not full M2 acceptance.
+The coordinator reached main at `3db7849`, with successful combined CI `43049880465`. Existing model launchers, caches and API remain unchanged; model-specific adapters and actual inference/cancellation checks remain required. This ownership increment is not full M2 acceptance.
+
+## M2 combined stage executor increment
+
+The private executor connects stage claims, registered cooperating workers, successful exit/reaping, snapshot validation and CAS. It exclusively owns a character namespace, rejects conflicting services, reconciles restart including the claim-before-lease boundary, preserves timeouts and cache hits, and records cancellation only after termination. Fifteen real subprocess tests pass, including concurrent wait/cancel and uncertain completion. See [execution protocol](character-executor.md). API and actual model adapters remain unconnected; this is not full M2 acceptance.
+
+Worker ownership reached main at `bc23fa8` with successful full combined CI `43055989345`. An evidence audit corrected earlier Dependency Graph run identifiers: publication CI is `43046217270`, coordinator CI is `43049880465`, sample CI is `43031720372`. The cancelled original contract CI is explicitly distinguished from later successful combined validation.

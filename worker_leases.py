@@ -127,7 +127,7 @@ class WorkerLease:
     def _confirm_resource_released(self):
         """Exiting tasks can lose readable environ before closing inherited FDs."""
         import fcntl
-        descriptor = os.open(self.resource, os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK)
+        descriptor = os.open(self.resource, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
         try:
             if not stat.S_ISREG(os.fstat(descriptor).st_mode):
                 raise OwnershipError('Cannot verify resource lock identity.')
@@ -142,6 +142,12 @@ class WorkerLease:
                     time.sleep(.02)
         finally:
             os.close(descriptor)
+
+    def verify_idle(self):
+        """Observe an idle resource for a never-launched attempt; not a reservation."""
+        if self.process is not None:
+            raise OwnershipError('Stop and reap this manager\'s worker before verifying idle.')
+        self._confirm_resource_released()
 
     def start(self, command, *, env=None):
         import fcntl
