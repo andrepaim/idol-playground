@@ -57,6 +57,11 @@ def _private_log(path):
     return os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'wb')
 
 
+def _validate_grace(grace):
+    if type(grace) not in (int, float) or not math.isfinite(grace) or not 0 <= grace <= 30:
+        raise ValueError('Grace period must be finite and between zero and 30 seconds.')
+
+
 class WorkerLease:
     def __init__(self, lease_file, resource_file):
         if sys.platform != 'linux' or not hasattr(os, 'pidfd_open') or not hasattr(signal, 'pidfd_send_signal'):
@@ -228,8 +233,7 @@ class WorkerLease:
                 os.close(descriptor)
 
     def _stop_owned(self, record, grace):
-        if type(grace) not in (int, float) or not math.isfinite(grace) or not 0 <= grace <= 30:
-            raise ValueError('Grace period must be finite and between zero and 30 seconds.')
+        _validate_grace(grace)
         owned = self._owned(record)
         for identity in owned:
             self._signal(identity, record, signal.SIGTERM)
@@ -243,6 +247,23 @@ class WorkerLease:
             time.sleep(.02)
         if self._owned(record):
             raise OwnershipError('Owned worker has not exited; resource ownership is retained.')
+
+    def _verify_worker(self, record, grace):
+        _validate_grace(grace)
+        deadline = time.monotonic() + min(5, max(.1, grace))
+        while True:
+            actual = _identity(record['worker']['pid'])
+            if actual is None or actual['terminal']:
+                return
+            if not _same(actual, record['worker']):
+                raise OwnershipError('Worker identity is foreign or reused; no signal sent.')
+            if _markers(actual['pid'], record):
+                return
+            # exit_mm can make environ unreadable before the task becomes a
+            # zombie. Observe without signaling; never infer signal ownership.
+            if time.monotonic() >= deadline:
+                raise OwnershipError('Worker markers are unverifiable; no signal sent.')
+            time.sleep(.01)
 
     def wait(self, *, timeout=None):
         if self.process is None:
@@ -260,9 +281,7 @@ class WorkerLease:
         if self.process is None:
             raise OwnershipError('Only the launching manager may cancel a live parent-owned worker.')
         record = self._read()
-        actual = _identity(record['worker']['pid'])
-        if actual and not actual['terminal'] and (not _same(actual, record['worker']) or not _markers(actual['pid'], record)):
-            raise OwnershipError('Worker identity is foreign or reused; no signal sent.')
+        self._verify_worker(record, grace)
         self._stop_owned(record, grace)
         code = self.process.wait(timeout=5)
         self._close_resource()
@@ -276,9 +295,7 @@ class WorkerLease:
         parent = _identity(record['parent']['pid'])
         if _same(parent, record['parent']) and not parent['terminal']:
             raise OwnershipError('Original parent is alive; do not steal its worker.')
-        actual = _identity(record['worker']['pid'])
-        if actual and not actual['terminal'] and (not _same(actual, record['worker']) or not _markers(actual['pid'], record)):
-            raise OwnershipError('Worker identity is foreign or reused; no signal sent.')
+        self._verify_worker(record, grace)
         self._stop_owned(record, grace)
         self._confirm_resource_released()
         record.update(state='interrupted', recovered_at=datetime.now(timezone.utc).isoformat())
