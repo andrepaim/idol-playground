@@ -99,6 +99,10 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: UV_PROJECT_ENVIRONMENT=.venv-check uv sync --locked --extra cpu --extra dev
+      - name: Prepare Ubuntu mirror fallback
+        run: |
+          python3 -m unittest discover -s scripts -p test_ci_apt.py
+          sudo --preserve-env=GITHUB_ACTIONS python3 scripts/ci_apt.py
       - run: .venv-check/bin/python -m playwright install --with-deps chromium
       - run: npm ci
       - run: npm run build
