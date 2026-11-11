@@ -33,13 +33,23 @@ Writes flush and fsync the temporary file, replace the target atomically on the 
 
 If rename succeeds but directory fsync fails, `CommitUncertain` means publication durability is unknown. It is incorrect to promise that every write error leaves the old pointer current. Reload and reconcile the observed revision before retrying; blind retry with the previous revision conflicts if the new pointer is already visible. Do not report success after this error or silently waive durability.
 
+## Worker artifact publication
+
+`publish_artifacts(identifier, stage, attempt, source_dir, names)` copies up to 64 named regular files from a server-selected finished worker directory into a new private attempt directory. Names are generated ASCII filenames, not paths. Unknown identities/stages/attempts, duplicates, symlinks and nonregular sources are rejected. The source directory and names must never come directly from an HTTP request or reasoning-model command.
+
+The helper streams bytes and hashes with bounded buffers, detects source size/mtime changes during copying, fsyncs copied files and their directory, renames the directory within the same filesystem, then fsyncs its parent. Each publication has a unique identity even when an attempt number is retried. Source files, earlier completed attempts, partial `.publishing-*` directories and orphaned final directories are preserved.
+
+Publication returns safe artifact references without changing the character record. Validate the **published immutable snapshot**, not the mutable worker originals, then commit succeeded status/fingerprint/references through `save(..., expected_revision=...)`. A stale metadata revision or failed validation leaves the new files unaccepted. An orphan directory is not a reusable completed stage. Post-rename directory-sync errors raise `CommitUncertain`; reconcile rather than blindly accepting or deleting those files.
+
+This publishes only inside the explicit private local store. It does not distribute assets, expose downloads, execute a worker, or grant redistribution rights.
+
 ## Integrity and platform boundary
 
 Metadata is capped at 1 MiB, validated against its content-addressed filename, schema, identity and revision. Reads anchor path components to directory descriptors and reject symlinks and nonregular files. Artifact verification streams SHA-256 with a 1 MiB read buffer, checks byte counts and rejects FIFO/device/directory references. No CUDA/device memory claim is involved.
 
 `reusable` requires succeeded status, validated outputs, matching execution fingerprint and matching on-disk bytes. `save` verifies every succeeded stage's current output bytes before publishing metadata. A record can remain inspectable after an artifact corrupts, but reuse fails. The caller must check reuse again before consuming dependencies.
 
-This module does **not** publish worker artifact directories or guarantee that externally written artifacts were fsynced. Artifact publication, execution ownership, retry state transitions, orphan-worker reconciliation, cancellation, recovery and API integration are subsequent M2 increments. A metadata lock does not establish GPU ownership or prove CUDA cleanup. Existing model/GPU runtime behavior is unchanged.
+Externally written worker files are not assumed durable: use the copy/publication helper and validate its snapshot before committing success. Execution ownership, retry state transitions, orphan-worker reconciliation, cancellation, recovery and API integration remain subsequent M2 increments. A metadata lock does not establish GPU ownership or prove CUDA cleanup. Existing model/GPU runtime behavior is unchanged.
 
 Durability primitives are intended for Linux/WSL local filesystems with POSIX locks, directory descriptors and directory fsync; acceptance uses actual isolated local files and competing processes. Network filesystems, Windows storage, power-loss hardware behavior and alternate filesystem durability are not certified. Failure/unavailable required primitives must be reported, not replaced by an unlocked write.
 
@@ -48,3 +58,5 @@ Durability primitives are intended for Linux/WSL local filesystems with POSIX lo
 Meaningful tests first failed on the absent module. Eight storage tests exercise create/read, stale writers, real competing processes, byte corruption, pointer/revision corruption, symlinks, injected pre-publication failure, post-rename sync uncertainty and nonregular artifact rejection. The FIFO regression failed by accepting an empty named pipe before the regular-file check was implemented. Every fixture lives in a disposable test directory; no owner artifacts, caches or running app are modified.
 
 All 95 Python tests and Ruff pass locally at this increment. Repository CI still validates the PR and its combined commit. Browser/model/GPU acceptance is required when these primitives are connected to affected runtime behavior, not inferred from these storage tests.
+
+Artifact-publication acceptance adds 13 isolated tests: successful publish/metadata/reuse round-trip, invalid names/identities/stages, source links/FIFO, source mutation, injected file-sync failure, post-rename uncertainty, retry identity and preservation of earlier files. All 108 Python tests pass locally. These tests do not establish CUDA lifecycle or integrated job recovery.
