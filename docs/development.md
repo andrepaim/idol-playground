@@ -27,7 +27,7 @@ Keep one active issue per session and coordinate GPU/port ownership. Worktrees d
 | `make models` | Pinned public model download |
 | `make doctor` | Read-only readiness report |
 | `make lint` | Ruff and ESLint |
-| `make test` | API/progress tests plus infrastructure regressions |
+| `make test` | JavaScript controller tests, API/progress tests and infrastructure regressions |
 | `make test-browser` | Real Chromium, built UI, synthetic API and splats |
 | `make check` | Lint, tests, browser acceptance, docs and whitespace |
 | `make check-security` | Committed-history data guard and Gitleaks |

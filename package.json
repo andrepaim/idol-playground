@@ -6,7 +6,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite --host 127.0.0.1",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --test tests/js/*.test.js"
   },
   "dependencies": {
     "@mkkellogg/gaussian-splats-3d": "0.4.7",
