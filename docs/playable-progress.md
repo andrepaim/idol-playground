@@ -56,7 +56,7 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 |---|---|
 | M0 | Partial audit/decisions; corpus and full baseline pending |
 | M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
-| M2 | Schema merged with successful combined CI; atomic metadata store in validation; coordinator/recovery pending |
+| M2 | Contracts, atomic store and artifact publication merged with successful CI; coordinator transitions in validation; process/recovery/API pending |
 | M3–M10 | Planned; dependency and acceptance gates remain applicable |
 
 ## M1 controller foundation
@@ -106,3 +106,11 @@ Worker output copies now receive private unique attempt directories, streamed ha
 Thirteen new disposable publication tests first failed on the absent method and now pass; all 108 Python tests pass. Failures cover unsafe names/links/FIFO, changing sources, disk/sync errors and uncertain post-rename publication. No app, model, GPU or legacy persistence integration changes. M2 execution ownership/recovery/API integration remains pending.
 
 The metadata store merged at `06a66af` and passed full combined CI `43042898464`. The CI infrastructure repair merged at `7307cfd` and passed combined CI `43041650418`; it uses the official digest-pinned Playwright image matching the locked package, retaining all actual browser acceptance tests.
+
+## M2 coordinator transition increment
+
+The coordinator claims stages using verified named dependencies and canonical input/settings/version fingerprints, returns only byte-verified cache hits, enforces one running stage per character, increments attempts and invalidates affected descendants. It validates immutable snapshots through explicit accept/review/reject decisions, persists hash-bound UTC receipts and commits with revision CAS. Late callbacks cannot replace corrections or retries. Original upload bytes must match the claimed hash.
+
+Eighteen new transition tests and all126 Python/33 infrastructure tests pass locally. `CommitUncertain` propagates for reconciliation instead of being overwritten with a blind failure. No process, GPU or API integration is claimed. See [coordinator details](character-coordinator.md).
+
+Artifact publication reached main at `11d24a0`, with successful combined CI `43046232723`. M0 corpus/model-quality baseline and M2 ownership/recovery/API work remain incomplete.
