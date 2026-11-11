@@ -323,3 +323,18 @@ service.start('a'*32,'fixture',{}, {},external_inputs={'upload':sha256(b'fixture
             assert not forbidden.exists()
     finally:
         if parent.poll() is None: parent.terminate();parent.wait(timeout=5)
+
+
+def test_context_validator_is_bound_to_original_claim_parameters(setup):
+    store,resource=setup
+    def mutating_builder(context):
+        context.parameters['confirmed']=True
+        return command(context)
+    def contextual(context,paths):
+        assert paths['input.png'].read_bytes()==ORIGINAL
+        assert context.parameters=={'confirmed':False}
+        return Decision('review',{'code':'explicit_confirmation_required'})
+    bound=Adapter('input',{'adapter':'context-fixture-v1'},('input.png',),mutating_builder,contextual,contextual=True)
+    with StageExecutor(store,resource,{'bound':bound}) as service:
+        claim=service.start(IDENTITY,'bound',{'confirmed':False},{},external_inputs=INPUT_HASHES)
+        assert service.wait(claim,timeout=5)['stages']['input']['state']=='awaiting_review'

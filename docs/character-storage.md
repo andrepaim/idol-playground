@@ -1,6 +1,6 @@
 # Character contract and storage foundation
 
-Status: M2 building blocks, not connected to the authoring API. Existing generation endpoints and completed outputs retain their current persistence behavior. This code alone does not enable restart recovery or resume inference. See [implementation progress](playable-progress.md).
+Status: M2 building blocks used by the opt-in [local character API](character-api.md). Existing generation endpoints and completed outputs retain their current persistence behavior. This code alone does not enable restart recovery or resume inference. See [implementation progress](playable-progress.md).
 
 ## Private contracts
 
@@ -60,3 +60,5 @@ Meaningful tests first failed on the absent module. Eight storage tests exercise
 All 95 Python tests and Ruff pass locally at this increment. Repository CI still validates the PR and its combined commit. Browser/model/GPU acceptance is required when these primitives are connected to affected runtime behavior, not inferred from these storage tests.
 
 Artifact-publication acceptance adds 13 isolated tests: successful publish/metadata/reuse round-trip, invalid names/identities/stages, source links/FIFO, source mutation, injected file-sync failure, post-rename uncertainty, retry identity and preservation of earlier files. All 108 Python tests pass locally. These tests do not establish CUDA lifecycle or integrated job recovery.
+
+`read_artifact` supports a bounded (at most 25 MiB), structurally validated, anchored and byte-verified read independently of stage approval. Previewing an awaiting-review result does not promote it to reusable/succeeded status. The API chooses smaller per-artifact limits and never serves private configuration/log files.

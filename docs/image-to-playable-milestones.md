@@ -1,6 +1,6 @@
 # Image to playable character: milestones and dependencies
 
-Status: planning proposal, 2026-11-11. See the [architecture and scope](image-to-playable-plan.md) and [validation contract](image-to-playable-validation.md). Milestone completion below means implementation accepted and merged with required evidence; none is marked complete by writing this plan.
+Status: adopted roadmap, 2026-11-11; see [implementation progress](playable-progress.md). See the [architecture and scope](image-to-playable-plan.md) and [validation contract](image-to-playable-validation.md). Milestone completion below means implementation accepted and merged with required evidence; none is marked complete by writing this plan.
 
 ## 1. Sequence and critical path
 

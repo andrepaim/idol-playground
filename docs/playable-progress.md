@@ -56,7 +56,7 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 |---|---|
 | M0 | Partial audit/decisions; corpus and full baseline pending |
 | M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
-| M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership merged with successful CI; combined executor/recovery in validation; API pending |
+| M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership merged with successful CI; combined executor/recovery merged with successful CI; local input/review API in validation; model integration pending |
 | M3–M10 | Planned; dependency and acceptance gates remain applicable |
 
 ## M1 controller foundation
@@ -126,3 +126,9 @@ The coordinator reached main at `3db7849`, with successful combined CI `43049880
 The private executor connects stage claims, registered cooperating workers, successful exit/reaping, snapshot validation and CAS. It exclusively owns a character namespace, rejects conflicting services, reconciles restart including the claim-before-lease boundary, preserves timeouts and cache hits, and records cancellation only after termination. Sixteen real subprocess tests pass, including concurrent wait/cancel and uncertain completion. See [execution protocol](character-executor.md). API and actual model adapters remain unconnected; this is not full M2 acceptance.
 
 Worker ownership reached main at `bc23fa8` with successful full combined CI `43055989345`. An evidence audit corrected earlier Dependency Graph run identifiers: publication CI is `43046217270`, coordinator CI is `43049880465`, sample CI is `43031720372`. The cancelled original contract CI is explicitly distinguished from later successful combined validation.
+
+## M2 API and M3 manual foundation increment
+
+An opt-in private character API now exposes real local CPU image preparation and manual anatomy review through the durable executor. Explicit upload identity supports duplicate reconnect, immutable originals, review/crop correction, status, selected verified artifacts, cancellation and retry. Prepared previews strip metadata; originals remain available even after cancellation. Context-aware validation is bound to the original claimed settings. The feature remains disabled by default, and no inference/reasoning provider or model adapter is registered. See [API behavior and limits](character-api.md).
+
+The combined executor reached main at `75e784c` with successful full combined CI `43071135069`. API/browser model integration and corpus acceptance remain incomplete; this input/manual foundation is not full M2/M3 acceptance.

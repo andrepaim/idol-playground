@@ -187,6 +187,23 @@ class CharacterStore:
         except (OSError, ValueError, KeyError, TypeError):
             return False
 
+    def read_artifact(self, identifier, artifact, *, limit):
+        """Bounded byte-verified read, independent of stage approval/reuse."""
+        if type(limit) is not int or not 0 < limit <= 25 * 1024 * 1024:
+            raise ValueError('Choose a positive artifact read limit up to 25 MiB.')
+        probe = new_character(identifier)
+        probe['stages']['input']['outputs'] = [artifact]
+        validate_character(probe)
+        if artifact['bytes'] > limit:
+            raise ValueError('Artifact exceeds the selected read limit.')
+        with os.fdopen(self._open(f"{identifier}/{artifact['path']}"), 'rb') as stream:
+            if os.fstat(stream.fileno()).st_size != artifact['bytes']:
+                raise ValueError('Artifact size does not match its reference.')
+            data = stream.read(limit + 1)
+        if len(data) != artifact['bytes'] or sha256(data).hexdigest() != artifact['sha256']:
+            raise ValueError('Artifact bytes do not match their reference.')
+        return data
+
     def publish_artifacts(self, identifier, stage, attempt, source_dir, names):
         """Publish trusted worker files, without accepting or updating a stage.
 
