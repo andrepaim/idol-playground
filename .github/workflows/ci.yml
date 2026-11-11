@@ -108,7 +108,7 @@ jobs:
         run: .venv-check/bin/python scripts/browser_image.py --runtime
       - run: npm ci
       - run: npm run build
-      - run: make test-browser
+      - run: .venv-check/bin/python -m pytest -q tests/browser
   required:
     name: Required validation
     if: always()
