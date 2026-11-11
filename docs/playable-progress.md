@@ -57,3 +57,9 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 | M0 | Partial audit/decisions; corpus and full baseline pending |
 | M1 | Ready for independent known-asset runtime increments |
 | M2–M10 | Planned; dependency and acceptance gates remain applicable |
+
+## M1 controller foundation
+
+A standalone pure JavaScript controller introduces a fixed 60 Hz simulation with bounded 250 ms catch-up, vector-normalized movement, acceleration/deceleration, bounded heading changes and swept axis-aligned obstacle collision. Its conservative square footprint uses the configured radius as half-width. It reports actual displacement speed so blocked movement can drive idle animation. Reset returns to an obstacle-free origin and clears accumulated simulation time.
+
+This increment does not expose a playable scene yet. Node tests cover frame schedules, diagonal input, thin-wall blocking/sliding, blocked speed, stopping/reset, invalid input and obstacle validation. They are included in `npm test`, `make test` and frontend CI. Rendering, canine anatomy and GPU performance remain untested by these logic tests.

@@ -18,6 +18,7 @@ lint:
 	.venv-check/bin/ruff check .
 	npm run lint
 test:
+	npm test
 	$(CHECK_PYTHON) -m pytest -q
 	$(CHECK_PYTHON) -m unittest discover -s scripts -p 'test_*.py'
 test-browser:
