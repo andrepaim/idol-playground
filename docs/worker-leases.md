@@ -18,7 +18,7 @@ Twelve disposable subprocess tests cover exit, private records/logs, exclusion, 
 
 ## RTX 3060 lifecycle receipt
 
-Clean tracked runtime revision `44c987e3aa09de3763e504eafadc62203e7b71f9`, 2026-11-11 UTC, Linux/WSL, RTX 3060 12,288 MiB, driver 610.88, PyTorch 2.15.0+cu132/CUDA 13.2. A disposable CUDA worker allocated and initialized 268,435,456 bytes and synchronized. PyTorch allocated/reserved both reported that size; this is not total device memory.
+Clean tracked runtime revision `eec17cf86fbfc1c4c7b1af2fa469dc2c10bd8be0`, 2026-11-11 UTC, Linux/WSL, RTX 3060 12,288 MiB, driver 610.88, PyTorch 2.15.0+cu132/CUDA 13.2. A disposable CUDA worker allocated and initialized 268,435,456 bytes and synchronized. PyTorch allocated/reserved both reported that size; this is not total device memory.
 
 All five scenarios passed: second cooperating launcher blocked while live; cancellation and direct-child reaping; subsequent CUDA allocation; parent crash followed by interrupted-lease recovery; subsequent CUDA allocation after crash. The known app was verified idle before stopping and restored ready afterward. Only owned disposable processes were terminated. Initial hardware acceptance exposed the resource-release race described above; its regression failed before the fix and the complete hardware run then passed.
 
