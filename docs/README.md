@@ -31,3 +31,5 @@
 - [Experimental canine walking](canine-walking.md): supported profile, playback, exports and measured limits.
 
 - [Playable implementation progress](playable-progress.md): decisions, baseline evidence, blockers and milestone status.
+
+- [Character storage foundation](character-storage.md): private stage contracts, atomic revisions, integrity checks and integration limits.
