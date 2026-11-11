@@ -29,6 +29,8 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts -p test_ci_validation.py
           python3 -m unittest discover -s scripts -p test_docs_validation.py
+          python3 -m unittest discover -s scripts -p test_browser_image.py
+          python3 scripts/browser_image.py
       - name: Select from complete Git evidence
         id: select
         env:
@@ -82,6 +84,9 @@ jobs:
       - run: npm run build
   browser:
     name: Browser acceptance
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.65.0-noble@sha256:f9294526294a7bdfb8ca8aa7d815c049125a10e73b65d47fb9a80f5d74f284a6
+      options: --ipc=host
     needs: plan
     if: needs.plan.outputs.mode == 'full'
     runs-on: ubuntu-24.04
@@ -99,11 +104,8 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: UV_PROJECT_ENVIRONMENT=.venv-check uv sync --locked --extra cpu --extra dev
-      - name: Prepare Ubuntu mirror fallback
-        run: |
-          python3 -m unittest discover -s scripts -p test_ci_apt.py
-          sudo --preserve-env=GITHUB_ACTIONS python3 scripts/ci_apt.py
-      - run: .venv-check/bin/python -m playwright install --with-deps chromium
+      - name: Verify bundled Chromium and version alignment
+        run: .venv-check/bin/python scripts/browser_image.py --runtime
       - run: npm ci
       - run: npm run build
       - run: make test-browser
