@@ -143,9 +143,24 @@ async function reports(data) {
   controls();
 }
 
+function characterLabel(data) {
+  let state = 'Needs repair';
+  if (!data.error) {
+    const input = data.stages.input.state, assessment = data.stages.assessment.state;
+    if (Object.values(data.stages).some((stage) => stage.state === 'running')) state = 'Working';
+    else if (input !== 'succeeded') state = labels[input];
+    else if (assessment === 'succeeded') state = 'Reviewed';
+    else if (['failed', 'awaiting_review', 'interrupted', 'cancelled'].includes(assessment)) state = 'Needs review';
+    else state = 'Image reviewed';
+  }
+  return `Character ${data.id.slice(0, 6)} · ${state}`;
+}
+
 function render(data) {
   if (record?.id === data.id && data.revision < record.revision) return;
   record = data;
+  const option = [...$('saved-character').options].find((item) => item.value === data.id);
+  if (option) option.textContent = characterLabel(data);
   badge('image-state', data.stages.input.state);
   badge('anatomy-state', data.stages.assessment.state);
   const prepared = artifact('input', 'prepared.png');
@@ -191,9 +206,9 @@ async function savedCharacters() {
   const data = await json('/api/characters');
   const select = $('saved-character');
   select.replaceChildren(new Option('New character…', ''));
-  data.characters.forEach((item, index) => {
-    const state = item.error ? 'Needs repair' : labels[item.stages.assessment.state === 'succeeded' ? 'succeeded' : item.stages.input.state];
-    select.add(new Option(`Character ${index + 1} · ${state}`, item.id));
+  data.characters.forEach((item) => {
+    const latest = !item.error && record?.id === item.id && record.revision > item.revision ? record : item;
+    select.add(new Option(characterLabel(latest), item.id));
   });
   select.value = currentId || '';
 }

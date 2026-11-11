@@ -108,6 +108,7 @@ def test_upload_review_anatomy_and_refresh_reconnect(character_page):
     for name in ('single-subject','full-body','limbs-separable','anatomy-confirmed'): page.locator('#'+name).check()
     page.locator('#save-anatomy').click()
     expect(page.locator('#anatomy-state')).to_have_text('Reviewed')
+    expect(page.locator('#saved-character option:checked')).to_contain_text('Reviewed')
     before=page.request.get('/api/characters/'+identifier).json()
     page.reload()
     expect(page.locator('#anatomy-state')).to_have_text('Reviewed')
