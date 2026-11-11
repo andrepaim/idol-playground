@@ -1,6 +1,6 @@
 # Private character authoring API
 
-Status: opt-in M2 API and M3 local/manual foundation. Browser workflow and model adapters follow separately. This increment does not certify the full image-to-playable pipeline or the corpus quality gates.
+Status: opt-in M2 API and M3 local/manual foundation. The [browser workflow](character-workflow.md) uses these routes; model adapters and quality acceptance follow separately. This increment does not certify the full image-to-playable pipeline or the corpus quality gates.
 
 ## Enable locally
 

@@ -33,3 +33,5 @@ Optional automatic rigging uses a third pinned environment and sequential bounde
 Turntable recording on a walking result holds the current animation pose and locks preview controls during capture. Afterwards it restores the prior playback state, keeping forward root travel and camera follow from moving the orbit target while recording.
 
 The opt-in character namespace uses durable stage contracts, immutable artifacts, registered cooperating workers and restart reconciliation. Its first exposed stages prepare an image and record manual anatomy review; existing model launchers remain separate. The character API is disabled by default and does not establish full image-to-playable or corpus acceptance. See [progress](playable-progress.md).
+
+The opt-in `/characters.html` page adds durable input/anatomy review and reconnection, with a capability-gated studio entry. It does not expose the future model stages yet. See [browser workflow](character-workflow.md).
