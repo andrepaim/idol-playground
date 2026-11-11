@@ -98,3 +98,11 @@ The opt-in store retains content-addressed revisions and atomically publishes a 
 Eight isolated filesystem/process tests and all 95 Python tests pass locally. Previous revisions and orphaned publications are preserved. This increment is not connected to the app and does not implement artifact publication, GPU ownership, recovery or resume; those remain M2 work. See [storage details](character-storage.md).
 
 M1 implementation reached main at `cd2f2e0`, with successful combined CI run `43031731151`. Contracts reached main at `434d7f2`, with successful combined CI run `43032877371`. The local app was refreshed while idle, retains all existing outputs/models, and serves the play page and sample endpoint. Neither result completes the M0 corpus/model-quality baseline or later product tiers.
+
+## M2 immutable artifact publication increment
+
+Worker output copies now receive private unique attempt directories, streamed hashes, file/directory sync and atomic directory rename. Originals and previous/partial/orphaned attempts are preserved. Mutable worker outputs cannot alter an already copied snapshot. Publication leaves metadata unchanged; the coordinator must validate that snapshot and commit through revision CAS.
+
+Thirteen new disposable publication tests first failed on the absent method and now pass; all 108 Python tests pass. Failures cover unsafe names/links/FIFO, changing sources, disk/sync errors and uncertain post-rename publication. No app, model, GPU or legacy persistence integration changes. M2 execution ownership/recovery/API integration remains pending.
+
+The metadata store merged at `06a66af` and passed full combined CI `43042898464`. The CI infrastructure repair merged at `7307cfd` and passed combined CI `43041650418`; it uses the official digest-pinned Playwright image matching the locked package, retaining all actual browser acceptance tests.

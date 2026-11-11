@@ -5,14 +5,16 @@ not GPU ownership. Supported/tested on Linux/WSL local filesystems.
 """
 from contextlib import contextmanager
 from hashlib import sha256
+import errno
 import json
 import os
 from pathlib import Path
 import re
 import stat
 import tempfile
+from uuid import uuid4
 
-from character_contracts import new_character, validate_character
+from character_contracts import DEPENDENCIES, new_character, validate_character
 
 MAX_METADATA = 1024 * 1024
 
@@ -184,3 +186,80 @@ class CharacterStore:
             return True
         except (OSError, ValueError, KeyError, TypeError):
             return False
+
+    def publish_artifacts(self, identifier, stage, attempt, source_dir, names):
+        """Publish trusted worker files, without accepting or updating a stage.
+
+        Source directory is server-selected, never an HTTP request path. The
+        coordinator must validate outputs and separately save with revision CAS.
+        """
+        if not isinstance(stage, str) or stage not in DEPENDENCIES or type(attempt) is not int or attempt < 1:
+            raise ValueError('Invalid artifact stage or attempt.')
+        if (not isinstance(names, (list, tuple)) or not 0 < len(names) <= 64
+                or not all(isinstance(name, str) and re.fullmatch('[a-zA-Z0-9_][a-zA-Z0-9_.-]*', name) for name in names)
+                or len(set(names)) != len(names)):
+            raise ValueError('Use unique generated artifact filenames without directory components.')
+        if self.load(identifier) is None:
+            raise ValueError('Create the character record before publishing artifacts.')
+        source_dir = Path(source_dir)
+        if source_dir.is_symlink():
+            raise ValueError('Worker source directory must not be a symlink.')
+        directory = None
+        sources = []
+        try:
+            directory = os.open(source_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            for name in names:
+                try:
+                    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+                except OSError as error:
+                    if error.errno == errno.ELOOP:
+                        raise ValueError('Worker artifacts must not be symlinks.') from error
+                    raise
+                sources.append((name, descriptor))
+                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                    raise ValueError('Worker artifacts must be regular files.')
+            # Directory setup only holds the metadata lock briefly. Copying does
+            # not block metadata reads/writes; the later CAS detects stale work.
+            with self._writer():
+                folder = self.root / identifier
+                artifacts = folder / 'artifacts'
+                self._directory(artifacts)
+                phase = artifacts / stage
+                self._directory(phase)
+                temporary = Path(tempfile.mkdtemp(prefix='.publishing-', dir=phase))
+            final = phase / f'{attempt}-{uuid4().hex}'
+            results = []
+            for name, descriptor in sources:
+                before = os.fstat(descriptor)
+                digest = sha256()
+                copied = 0
+                target = os.open(temporary / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(target, 'wb') as destination:
+                    while data := os.read(descriptor, min(1024 * 1024, before.st_size - copied + 1)):
+                        copied += len(data)
+                        if copied > before.st_size:
+                            raise ValueError('Worker artifact changed during publication.')
+                        destination.write(data)
+                        digest.update(data)
+                    destination.flush()
+                    os.fsync(destination.fileno())
+                after = os.fstat(descriptor)
+                if copied != before.st_size or (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+                    raise ValueError('Worker artifact changed during publication.')
+                results.append({'path': (final / name).relative_to(folder).as_posix(), 'sha256': digest.hexdigest(), 'bytes': copied})
+            _sync_directory(temporary)
+            if final.exists():
+                raise ValueError('Published attempt identity already exists.')
+            os.rename(temporary, final)
+            try:
+                _sync_directory(phase)
+            except OSError as error:
+                raise CommitUncertain('Artifact publication durability uncertain; reconcile before retry.') from error
+            return results
+        finally:
+            # Failed directories remain private and unreferenced for inspection;
+            # source files and previous completed attempts are never deleted.
+            for _, descriptor in sources:
+                os.close(descriptor)
+            if directory is not None:
+                os.close(directory)

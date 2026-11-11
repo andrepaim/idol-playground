@@ -23,7 +23,7 @@ conflicts = [[{extra = "cpu"}, {extra = "local"}]]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["tests/test_character_store.py", "tests/test_character_contracts.py", "tests/test_playable_package.py", "tests/test_app.py", "tests/test_progress.py", "tests/test_mesh.py", "tests/test_rig.py", "tests/test_walk.py", "tests/test_splat_mesh.py", "tests/test_splat_integration.py", "experiments/walking/test_pose.py"]
+testpaths = ["tests/test_character_publication.py", "tests/test_character_store.py", "tests/test_character_contracts.py", "tests/test_playable_package.py", "tests/test_app.py", "tests/test_progress.py", "tests/test_mesh.py", "tests/test_rig.py", "tests/test_walk.py", "tests/test_splat_mesh.py", "tests/test_splat_integration.py", "experiments/walking/test_pose.py"]
 
 [tool.uv.sources]
 torch = [{index = "pytorch-cpu", extra = "cpu"}]
