@@ -133,7 +133,7 @@ def browser_page(site):
                     job.update(output_type='rig',source_job='fixture',rig={'bones':2,'triangles':1},files={'rigged.glb':'/rig-fixture.glb','rigged.fbx':'/rigged.fbx','character.blend':'/character.blend'})
                 if phase == 'complete' and state['output_type'] == 'walk':
                     job.update(id='walk-fixture',output_type='walk',source_job='rig-fixture',settings={'speed':'relaxed','motion':'forward'},
-                               walk={'bones':2,'triangles':1,'duration':1.25,'stride':.16,'ground_z':0,'warnings':['Experimental canine walk']},
+                               walk={'profile':'canine-34-v1','bones':2,'triangles':1,'duration':1.25,'stride':.16,'ground_z':0,'warnings':['Experimental canine walk']},
                                files={'animated.glb':'/walk-fixture.glb','walk-inplace.glb':'/walk-fixture.glb','walk-forward.glb':'/walk-fixture.glb','animated.fbx':'/animated.fbx','character.blend':'/character.blend','walk.json':'/walk.json'})
                 route.fulfill(json=job)
 
@@ -430,6 +430,8 @@ def test_walk_review_progress_playback_cancel_and_saved_reopening(browser_page):
     state['phase']='complete'
     expect(page.locator('#busy')).to_be_hidden(timeout=20000)
     expect(page.locator('#walk-playback')).to_be_visible()
+    expect(page.locator('#play-canine')).to_be_visible()
+    expect(page.locator('#play-canine')).to_have_attribute('href', '/play.html?model=%2Fwalk-fixture.glb&profile=canine-34-v1&stride=0.16')
     expect(page.locator('#walk-exports')).to_be_visible()
     expect(page.locator('#bend-control')).to_be_hidden()
     expect(page.locator('#message')).to_be_hidden()
@@ -540,3 +542,60 @@ def test_turntable_preserves_walking_playback_and_controls(browser_page):
     expect(page.locator('#walk-play')).to_have_text('Play')
     assert float(page.locator('#walk-time').input_value())==pytest.approx(.4,abs=.01)
     expect(page.locator('#message')).to_be_hidden()
+
+
+def inplace_bytes():
+    """Authored procedural triangle/rig fixture; no downloaded or private assets."""
+    data = rig_bytes()
+    length = struct.unpack_from('<I', data, 12)[0]
+    doc = json.loads(data[20:20 + length])
+    binary = data[28 + length:]
+    doc['animations'][0]['name'] = 'Walk_inplace'
+    encoded = json.dumps(doc).encode()
+    encoded += b' ' * (-len(encoded) % 4)
+    chunks = struct.pack('<I4s', len(encoded), b'JSON') + encoded + struct.pack('<I4s', len(binary), b'BIN\0') + binary
+    return struct.pack('<4sII', b'glTF', 2, len(chunks) + 12) + chunks
+
+
+def test_play_scene_keyboard_collision_reset_and_focus(site):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=['--no-sandbox', '--enable-unsafe-swiftshader'])
+        page = browser.new_page()
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        page.route('**/outputs/fixture/walk-inplace.glb', lambda route: route.fulfill(body=inplace_bytes(), content_type='model/gltf-binary'))
+        page.goto(site + '/play.html?model=/outputs/fixture/walk-inplace.glb&profile=canine-34-v1&stride=0.16')
+        expect(page.locator('#play-status')).to_contain_text('Ready')
+        canvas = page.locator('#play-view canvas')
+        canvas.click()
+        page.keyboard.down('ArrowUp')
+        page.wait_for_timeout(700)
+        expect(page.locator('#play-motion')).to_have_text('Walking')
+        assert abs(float(page.locator('#play-view').get_attribute('data-z'))) > .02
+        page.keyboard.up('ArrowUp')
+        page.locator('#play-reset').click()
+        assert float(page.locator('#play-view').get_attribute('data-z')) == 0
+        canvas.click()
+        page.keyboard.down('ArrowUp')
+        page.locator('#play-reset').focus()
+        page.wait_for_timeout(500)
+        before = page.locator('#play-view').get_attribute('data-z')
+        page.wait_for_timeout(300)
+        assert page.locator('#play-view').get_attribute('data-z') == before
+        page.keyboard.up('ArrowUp')
+        expect(page.locator('#play-motion')).to_have_text('Standing')
+        assert not errors
+        browser.close()
+
+
+def test_play_scene_rejects_invalid_source_and_wrong_animation(site):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=['--no-sandbox', '--enable-unsafe-swiftshader'])
+        page = browser.new_page()
+        page.goto(site + '/play.html?model=https://example.com/private.glb&profile=canine-34-v1')
+        expect(page.locator('#play-status')).to_contain_text('same-origin')
+        page.route('**/outputs/fixture/walk-inplace.glb', lambda route: route.fulfill(body=rig_bytes(), content_type='model/gltf-binary'))
+        page.goto(site + '/play.html?model=/outputs/fixture/walk-inplace.glb&profile=canine-34-v1&stride=0.16')
+        expect(page.locator('#play-status')).to_contain_text('Walk_inplace')
+        expect(page.locator('#play-view canvas')).to_have_count(0)
+        browser.close()

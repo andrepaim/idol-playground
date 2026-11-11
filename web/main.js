@@ -591,6 +591,9 @@ async function showWalk(job) {
   for (const [id,name] of Object.entries({'walk-inplace':'walk-inplace.glb','walk-forward':'walk-forward.glb','walk-fbx':'animated.fbx','walk-blend':'character.blend','walk-report':'walk.json'})) $(id).href = job.files[name];
   $('walk-source').href = `/outputs/${job.source_job}/rigged.glb`;
   $('walk-exports').hidden = false;
+  const playable = job.walk.profile === 'canine-34-v1' && Boolean(job.files['walk-inplace.glb']);
+  $('play-canine').hidden = !playable;
+  if (playable) $('play-canine').href = '/play.html?' + new URLSearchParams({model:job.files['walk-inplace.glb'],profile:job.walk.profile,stride:String(job.walk.stride)});
   showProgress({stage:'preview',message:'Opening the walking preview…'});
   try {
     await disposeViewer();

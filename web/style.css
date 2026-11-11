@@ -18,3 +18,10 @@
 #walk-time { width: 150px; }
 #walk-exports a { font-size: 13px; }
 [hidden] { display: none !important; }
+
+.play-page { max-width: 1100px; margin: auto; padding: 24px; }
+#play-view { width: 100%; height: min(65vh, 650px); min-height: 280px; }
+#play-view canvas { display: block; outline-offset: -3px; }
+.play-controls { display: flex; gap: 20px; align-items: center; padding: 12px 0; }
+.play-page header { display: block; padding: 0 0 12px; }
+.play-page h1 { font-size: clamp(2rem, 5vw, 3rem); margin: 12px 0; }
