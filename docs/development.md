@@ -12,6 +12,8 @@ make check
 
 Keep one active issue per session and coordinate GPU/port ownership. Worktrees do not share ignored models or environments automatically. Download assets deliberately or link an existing trusted local model directory; never commit it. Do not run concurrent inference or interrupt another session's jobs.
 
+The optional [application GPU reservation](gpu-reservation.md) holds a shared user-cache reservation across opted-in Linux/WSL app instances, including idle model cache and inherited direct workers. It is disabled by default and does not enable character model adapters; its cooperating-instance and descendant limitations still apply.
+
 ## Environments and commands
 
 `pyproject.toml` declares mutually exclusive `cpu` and `local` extras. `make bootstrap` uses `UV_PROJECT_ENVIRONMENT=.venv-check uv sync --locked --extra cpu --extra dev`; `make setup-local` uses `.venv` and the `local` extra. Never point the CPU profile at a working CUDA environment. `uv run --no-sync` avoids incidental synchronization for ad hoc commands in an installed environment.

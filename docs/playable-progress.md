@@ -140,3 +140,7 @@ The combined executor reached main at `75e784c` with successful full combined CI
 A separate character page connects the opt-in API to real image/manual-review controls, saved-character selection, crop confirmation, status, cancellation/retry and verified downloads. Validated URL identity reconnects after refresh without submitting work. Delayed reports wait before enabling edits; delayed status cannot regress newer displayed revisions. Local preview URLs are disposed and the page uses local assets/API only. See [workflow behavior and validation limits](character-workflow.md).
 
 The API reached main at `e5b720a` with successful full combined CI `43075985489`. The browser workflow is a preparation/review foundation; model adapters, reasoning evaluation and corpus/quality gates remain unaccepted. 3D/playable stages are explicitly unavailable in this new workflow.
+
+## M2 application reservation increment
+
+An opt-in [application GPU reservation](gpu-reservation.md) excludes cooperating opted-in instances using the same user-cache resource. It covers startup/recovery, idle cache and shutdown, and is inherited by registered direct workers. Cached tensors are released while the reservation is still held. The default remains disabled; actual RTX acceptance and CI are required before this increment is merged. Same-app model/cache handoff and vendor descendant audits remain separate prerequisites for character model adapters. This is not full M2 acceptance.

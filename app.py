@@ -1,7 +1,7 @@
 """Local web server. The model is loaded lazily, once, in a single worker."""
 
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 import asyncio
 import gc
 from importlib.util import find_spec
@@ -40,7 +40,7 @@ OUTPUTS.mkdir(exist_ok=True)
 MAX_UPLOAD = 20 * 1024 * 1024
 Image.MAX_IMAGE_PIXELS = 25_000_000
 @asynccontextmanager
-async def lifespan(app):
+async def _services_lifespan(app):
     character_service = None
     character_monitor = None
     app.state.character_service = None
@@ -72,6 +72,27 @@ async def lifespan(app):
             executor.shutdown(wait=True, cancel_futures=True)
 
 
+@asynccontextmanager
+async def lifespan(app):
+    from gpu_reservation import application_reservation
+    enabled=os.environ.get('IDOL_GPU_RESERVATION')=='1'
+    app.state.gpu_reserved=False
+    with application_reservation() if enabled else nullcontext():
+        app.state.gpu_reserved=enabled
+        try:
+            if enabled and os.environ.get('IDOL_CHARACTERS')=='1':
+                from gpu_reservation import default_resource
+                stage_resource=Path(os.environ.get('IDOL_CHARACTER_RESOURCE',ROOT/'.local/character-resource.lock'))
+                if stage_resource.resolve()==default_resource().resolve():
+                    raise ValueError('Application reservation and worker lease files must be distinct.')
+            async with _services_lifespan(app):
+                yield
+        finally:
+            if enabled:
+                release_idol()
+            app.state.gpu_reserved=False
+
+
 app = FastAPI(title="Idol Playground", lifespan=lifespan)
 executor = ThreadPoolExecutor(max_workers=1)
 lock = threading.Lock()
@@ -87,6 +108,8 @@ def status():
     installed = find_spec("idol") is not None
     characters = getattr(app.state, 'character_service', None)
     return {
+        "gpu_reservation": {"enabled": os.environ.get('IDOL_GPU_RESERVATION')=='1',
+                            "held": getattr(app.state,'gpu_reserved',False)},
         "characters": {"enabled": characters is not None, "ready": characters.ready if characters else False,
                        "available_stages": ["input", "assessment"] if characters else []},
         "walk": {"ready": walk_backend_installed()},
