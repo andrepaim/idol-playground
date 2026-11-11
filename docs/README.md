@@ -29,3 +29,5 @@
 - [Rig correction and motion trial](rig-correction-results.md): surface weight transfer, pose-export regression and remaining walk gates.
 
 - [Experimental canine walking](canine-walking.md): supported profile, playback, exports and measured limits.
+
+- [Playable implementation progress](playable-progress.md): decisions, baseline evidence, blockers and milestone status.
