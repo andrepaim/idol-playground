@@ -198,3 +198,16 @@ def test_special_files_cannot_be_accepted_as_artifacts(tmp_path, monkeypatch):
     thread.join(timeout=5)
     assert not thread.is_alive()
     assert result == [False]
+
+
+def test_bounded_verified_artifact_read_does_not_approve_stage(tmp_path):
+    store=CharacterStore(tmp_path)
+    record=completed(store,tmp_path)
+    artifact=record['stages']['input']['outputs'][0]
+    pending=new_character(IDENTITY);store.save(pending,expected_revision=None)
+    assert store.read_artifact(IDENTITY,artifact,limit=7)==b'fixture'
+    assert store.load(IDENTITY)==pending
+    with pytest.raises(ValueError): store.read_artifact(IDENTITY,artifact,limit=6)
+    (tmp_path/IDENTITY/'input.png').write_bytes(b'changed')
+    with pytest.raises(ValueError): store.read_artifact(IDENTITY,artifact,limit=7)
+    with pytest.raises(ValueError): store.read_artifact(IDENTITY,{**artifact,'path':'../escape'},limit=7)

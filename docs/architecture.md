@@ -16,6 +16,9 @@ The browser polls `/api/jobs/{id}`, displays stages and adaptive ETA, loads the 
 | `POST /api/jobs/{id}/mesh` | Convert completed splat without regeneration |
 | `POST /api/jobs/{id}/rig` | Rig completed mesh |
 | `POST /api/jobs/{id}/cancel` | Cancel mesh/rig work and reap workers |
+| `GET /api/jobs/{id}/playable-sample` | Portable known-canine Three.js sample |
+| `/play.html` | Known reviewed canine gameplay scene |
+| `/api/characters...` | Opt-in private local input/manual-review workflow; see [character API](character-api.md) |
 | `GET /api/jobs/{id}` | Progress or persisted completed job metadata |
 | `/outputs/...` | Locally stored artifacts |
 
@@ -28,3 +31,5 @@ Splat-derived meshes, legacy TripoSR, cancellation, mesh preview, skeleton predi
 Optional automatic rigging uses a third pinned environment and sequential bounded UniRig/Blender phase processes. Both skeleton and skin models run locally with offline assets; exports retain source UVs/textures or vertex colors and are reimported for binding/appearance checks. A separate rig job preserves its completed static source job and shares GPU ownership, cancellation and persisted status with mesh generation.
 
 Turntable recording on a walking result holds the current animation pose and locks preview controls during capture. Afterwards it restores the prior playback state, keeping forward root travel and camera follow from moving the orbit target while recording.
+
+The opt-in character namespace uses durable stage contracts, immutable artifacts, registered cooperating workers and restart reconciliation. Its first exposed stages prepare an image and record manual anatomy review; existing model launchers remain separate. The character API is disabled by default and does not establish full image-to-playable or corpus acceptance. See [progress](playable-progress.md).

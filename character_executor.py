@@ -28,6 +28,7 @@ class Adapter:
     names: tuple
     command: object
     validator: object
+    contextual: bool = False
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class _Run:
     lease: WorkerLease
     workspace: Path
     adapter: Adapter
+    context: Context
 
 
 class StageExecutor:
@@ -56,12 +58,13 @@ class StageExecutor:
             if (not isinstance(key, str) or not re.fullmatch('[a-zA-Z0-9_-]{1,64}', key)
                     or not isinstance(adapter, Adapter) or adapter.stage not in DEPENDENCIES
                     or not adapter.versions or not callable(adapter.command) or not callable(adapter.validator)
+                    or type(adapter.contextual) is not bool
                     or not isinstance(adapter.names, tuple) or not 0 < len(adapter.names) <= 64
                     or not all(isinstance(name, str) and re.fullmatch('[a-zA-Z0-9_][a-zA-Z0-9_.-]*', name) for name in adapter.names)
                     or len(set(adapter.names)) != len(adapter.names) or {'_execution.json','_validation.json'}.intersection(adapter.names)):
                 raise ValueError('Adapters must be explicit trusted code with unique generated output names.')
             fingerprint(adapter.stage, {}, {}, adapter.versions)
-            self.adapters[key] = Adapter(adapter.stage, deepcopy(adapter.versions), adapter.names, adapter.command, adapter.validator)
+            self.adapters[key] = Adapter(adapter.stage, deepcopy(adapter.versions), adapter.names, adapter.command, adapter.validator, adapter.contextual)
         self._mutex = threading.RLock()
         self._runs = {}
         self._closed = False
@@ -122,6 +125,8 @@ class StageExecutor:
             adapter = self.adapters[adapter_key]
             parameters, input_names = deepcopy(parameters), deepcopy(input_names)
             versions = {**adapter.versions,'executor':'v1','registered_adapter':adapter_key}
+            if adapter.contextual:
+                versions['context_validation'] = 'v1'
             try:
                 claim = self.coordinator.start(identifier,adapter.stage,parameters,versions,input_names,external_inputs=external_inputs)
             except CommitUncertain:
@@ -144,8 +149,9 @@ class StageExecutor:
                     for name in names:
                         matches = [item for item in record['stages'][dependency]['outputs'] if Path(item['path']).name == name]
                         inputs[f'{dependency}:{name}'] = self.store.root/identifier/matches[0]['path']
-                argv = adapter.command(Context(claim,workspace,parameters,inputs))
-                self._runs[(identifier,claim.stage,claim.attempt)] = _Run(claim,lease,workspace,adapter)
+                context = Context(claim,workspace,deepcopy(parameters),deepcopy(inputs))
+                argv = adapter.command(Context(claim,workspace,deepcopy(parameters),deepcopy(inputs)))
+                self._runs[(identifier,claim.stage,claim.attempt)] = _Run(claim,lease,workspace,adapter,context)
                 lease.start(argv)
                 return claim
             except BaseException:
@@ -198,7 +204,10 @@ class StageExecutor:
                 record = self._end(claim,'failed','worker_exit')
             else:
                 try:
-                    record = self.coordinator.finish(claim,run.workspace,run.adapter.names,run.adapter.validator)
+                    validator = run.adapter.validator
+                    if run.adapter.contextual:
+                        validator = lambda paths: run.adapter.validator(deepcopy(run.context),paths)
+                    record = self.coordinator.finish(claim,run.workspace,run.adapter.names,validator)
                 except CommitUncertain:
                     self._blocked = True
                     raise

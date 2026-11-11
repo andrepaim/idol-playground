@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+import asyncio
 import gc
 from importlib.util import find_spec
 from io import BytesIO
@@ -40,10 +41,35 @@ MAX_UPLOAD = 20 * 1024 * 1024
 Image.MAX_IMAGE_PIXELS = 25_000_000
 @asynccontextmanager
 async def lifespan(app):
-    yield
-    for event in list(mesh_cancellations.values()):
-        event.set()
-    executor.shutdown(wait=True, cancel_futures=True)
+    character_service = None
+    character_monitor = None
+    app.state.character_service = None
+    if os.environ.get('IDOL_CHARACTERS') == '1':
+        from character_service import CharacterService
+        from character_api import monitor
+        character_service = CharacterService(
+            Path(os.environ.get('IDOL_CHARACTER_STORE', ROOT / '.local/characters')),
+            Path(os.environ.get('IDOL_CHARACTER_RESOURCE', ROOT / '.local/character-resource.lock')),
+        )
+        app.state.character_service = character_service
+        character_monitor = asyncio.create_task(monitor(character_service))
+    try:
+        yield
+    finally:
+        try:
+            if character_monitor is not None:
+                character_monitor.cancel()
+                try:
+                    await character_monitor
+                except asyncio.CancelledError:
+                    pass
+            if character_service is not None:
+                character_service.close()
+            app.state.character_service = None
+        finally:
+            for event in list(mesh_cancellations.values()):
+                event.set()
+            executor.shutdown(wait=True, cancel_futures=True)
 
 
 app = FastAPI(title="Idol Playground", lifespan=lifespan)
@@ -59,7 +85,10 @@ mesh_cancellations = {}
 @app.get("/api/status")
 def status():
     installed = find_spec("idol") is not None
+    characters = getattr(app.state, 'character_service', None)
     return {
+        "characters": {"enabled": characters is not None, "ready": characters.ready if characters else False,
+                       "available_stages": ["input", "assessment"] if characters else []},
         "walk": {"ready": walk_backend_installed()},
         "splat_mesh": {"ready": splat_backend_installed(), "weights_downloaded": splat_models_ready(),
                        "upload_ready": splat_idol_installed() and models_ready()},
@@ -559,6 +588,10 @@ def cancel_mesh(job_id: str):
         jobs[job_id]['message'] = 'Stopping the generation worker…'
     return {'id': job_id, 'state': 'cancelling'}
 
+
+from character_api import router as character_router, CharacterUploadLimit
+app.add_middleware(CharacterUploadLimit)
+app.include_router(character_router)
 
 app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
 if (ROOT / "dist").is_dir():

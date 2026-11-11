@@ -1,10 +1,10 @@
 # Image to playable character: implementation plan
 
-Status: **proposal; no implementation authorized by this document**. Prepared 2026-11-11 against `origin/main` at `49793c405283133295ee200c8e0a788d14454055` on `docs/image-to-playable-plan`.
+Status: **adopted for implementation by the user on 2026-11-11**; work is in progress. See [implementation evidence](playable-progress.md). Originally prepared against `origin/main` at `49793c405283133295ee200c8e0a788d14454055` on `docs/image-to-playable-plan`.
 
 This plan turns a photo, drawing, or rendered image of a person, animal, or person-like character into a controllable character in a Three.js scene. It extends the existing local app. It does not promise a correct reconstruction of every subject from one image: unseen anatomy is inferred, and some inputs must be corrected or rejected.
 
-Read this document for product behavior and architecture, [milestones](image-to-playable-milestones.md) for implementation order and dependencies, and [validation](image-to-playable-validation.md) for acceptance and evidence. The older [Game Character plan](game-character-plan.md) and [natural walking plan](natural-walking-plan.md) remain historical context. This proposal adds the broader playable-character direction; it does not claim their outstanding criteria are complete.
+Read this document for product behavior and architecture, [milestones](image-to-playable-milestones.md) for implementation order and dependencies, and [validation](image-to-playable-validation.md) for acceptance and evidence. The older [Game Character plan](game-character-plan.md) and [natural walking plan](natural-walking-plan.md) remain historical context. This roadmap adds the broader playable-character direction; it does not claim their outstanding criteria are complete.
 
 ## 1. Product outcome and scope
 
@@ -187,7 +187,7 @@ Storage has no automatic destructive cleanup in this feature. Show estimated/act
 
 Keep existing generation, mesh, rig, walk, status and download contracts. Preserve the omitted-backend legacy behavior. Add a character coordinator facade rather than forcing every old endpoint into a new implementation at once.
 
-Candidate operations are create character from upload/completed job, read character/stages, submit review corrections, retry stage, cancel work, and build/download package. Final paths and response schemas are a milestone M2 design decision. Use artifact IDs and validated options rather than arbitrary filesystem paths. Polling is sufficient initially; streaming progress is optional.
+Candidate operations are create character from upload/completed job, read character/stages, submit review corrections, retry stage, cancel work, and build/download package. The opt-in local input/review/status/retry/cancel paths are documented in the [character API](character-api.md); model/package integration remains pending. Use artifact IDs and validated options rather than arbitrary filesystem paths. Polling is sufficient initially; streaming progress is optional.
 
 The interface adds a stage rail, side-by-side source/result review, body-plan and rig review controls, explicit quality badges, a playable tab and downloads. Show why a stage is blocked and the smallest corrective action. A low-confidence AI answer must not trigger an endless spinner or silent backend change. Browser reload reconnects to durable status rather than restarting generation.
 
