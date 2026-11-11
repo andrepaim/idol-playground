@@ -48,3 +48,13 @@ A post-publication uncertain commit returns 503 and blocks new mutations until s
 ## Validation
 
 API tests use actual registered PIL subprocesses, synthetic images and disposable private stores. They cover upload/review/correction, idempotency/concurrency, privacy, metadata removal, crop/EXIF orientation, cancellation/retry/original preservation, cache hits, anatomy outcomes, malformed/oversized/bomb inputs, corrupt/symlinked artifacts, loopback/origin checks, disabled/unsupported environments and uncertain publication/restart. Legacy API tests also remain required. Actual HTTP and unchanged GPU lifecycle acceptance are recorded with the final tested revision before merge. Browser reconnection/review UI and model-quality evaluation remain subsequent work.
+
+## Acceptance receipt
+
+Clean tracked runtime revision `05b9dd199450112a17962d204878b82b1bfdd7a1`, 2026-11-11 UTC, Linux/WSL, Python 3.11.15, FastAPI 0.162.2. All 177 Python tests (20 API cases), 33 infrastructure tests, Ruff, documentation links and whitespace pass.
+
+An actual Uvicorn server on an OS-assigned loopback port/private disposable store passed five HTTP scenarios: upload/preparation pause, duplicate reconnect without another attempt, review and verified original/preview downloads, manual annotation, and full server restart preserving status/bytes/identity. The input was a generated cyan rectangle; the manual annotation is a protocol test, not anatomical-quality evidence. Private receipt: `.local/api-http-receipt.json` in the API worktree.
+
+At the same clean runtime revision, all five primitive and six combined-executor CUDA lifecycle scenarios passed again on RTX 3060 12,288 MiB, driver 610.88, Torch 2.15.0+cu132/CUDA 13.2. Workers allocated/initialized/synchronized 256 MiB; allocated/reserved both reported that size. Tests establish cooperating-worker exclusion, cancel/reap/retry, cache reuse and crash/recovery/retry only. They do not establish total VRAM ceilings, actual model inference, reconstruction quality or arbitrary descendant cleanup. The known app was verified idle before stopping and restored ready afterward. Owner inputs, completed outputs, caches and other workspaces were preserved.
+
+The final source changes after this receipt are documentation only. PR and combined-main CI remain required; author review is not independent approval. Browser reconnection/review acceptance is reserved for the subsequent UI increment.

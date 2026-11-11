@@ -1,6 +1,6 @@
 # Durable stage execution
 
-`character_executor.StageExecutor` connects the [stage coordinator](character-coordinator.md), private store and [cooperating worker protocol](worker-leases.md). This opt-in Linux/WSL component is not wired to existing HTTP routes or model launchers. It supplies no production inference adapters.
+`character_executor.StageExecutor` connects the [stage coordinator](character-coordinator.md), private store and [cooperating worker protocol](worker-leases.md). The opt-in [character API](character-api.md) uses this Linux/WSL component for CPU input/manual-review stages; existing model launchers remain separate. It supplies no production inference adapters.
 
 ## Ownership and adapters
 
@@ -41,3 +41,7 @@ Six scenarios passed through the combined executor: second service's worker laun
 The disposable crash-during-lease-publication test confirms the ungranted target never executes and a replacement service can retry. No model inference path changed. Full PR and combined-main CI remain required; author review is not independent approval.
 
 The final runtime revision above also reran all five primitive CUDA lifecycle scenarios after the CI-discovered environment-read exit race was fixed. Both complete hardware runs passed with clean tracked files.
+
+## Context-bound validators
+
+An adapter may opt into `contextual=True`, receiving `(Context, paths)` at validation. The context is copied independently from the original claimed settings and selected inputs; command-builder mutations cannot alter it. Context validation has its own fingerprint version. Existing path-only adapters retain their interface. This lets approval/crop/manual-review validators bind a snapshot to the actual requested settings instead of trusting approval fields echoed by a worker.

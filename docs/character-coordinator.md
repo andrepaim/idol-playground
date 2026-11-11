@@ -1,6 +1,6 @@
 # Character stage coordinator foundation
 
-Status: M2 transition logic, not wired to the authoring API or model workers. It uses [private contracts and storage](character-storage.md). It does not provide process ownership, GPU exclusivity, cancellation/reaping, startup reconciliation or inference resume.
+Status: M2 transition logic used by the opt-in [local character API](character-api.md); existing model workers remain separate. It uses [private contracts and storage](character-storage.md). It does not provide process ownership, GPU exclusivity, cancellation/reaping, startup reconciliation or inference resume.
 
 ## Claim and cache rules
 
@@ -38,7 +38,7 @@ The future process layer must stop/reap a worker before applying cancellation or
 
 `CommitUncertain` propagates without a blind failure write: the new validated pointer may already be visible even though directory durability failed. The caller must reconcile/resync before reporting durable completion or retrying. No success is returned after that error.
 
-Current API/defaults, legacy job persistence and actual inference remain unchanged. Process lease/recovery, trusted adapter execution, API/browser integration and real-GPU lifecycle acceptance are subsequent M2 increments. CPU transition tests do not certify CUDA behavior or model/anatomy quality.
+Legacy API/defaults, legacy job persistence and actual inference remain unchanged. The local API connects trusted CPU adapters through the executor and lease layer; browser and model integration remain later increments. CPU transition tests do not certify CUDA behavior or model/anatomy quality.
 
 ## Evidence
 
