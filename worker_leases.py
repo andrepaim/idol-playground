@@ -124,6 +124,25 @@ class WorkerLease:
             os.close(self._fd)  # do not LOCK_UN: a child may still hold this OFD
             self._fd = None
 
+    def _confirm_resource_released(self):
+        """Exiting tasks can lose readable environ before closing inherited FDs."""
+        import fcntl
+        descriptor = os.open(self.resource, os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise OwnershipError('Cannot verify resource lock identity.')
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    return
+                except BlockingIOError as error:
+                    if time.monotonic() >= deadline:
+                        raise OwnershipError('A worker still holds the resource; completion is unverified.') from error
+                    time.sleep(.02)
+        finally:
+            os.close(descriptor)
+
     def start(self, command, *, env=None):
         import fcntl
         if self.process is not None or self.path.exists():
@@ -220,11 +239,10 @@ class WorkerLease:
         code = self.process.wait(timeout=timeout)
         record = self._read()
         self._stop_owned(record, .2)
+        self._close_resource()
+        self._confirm_resource_released()
         record.update(state='exited', returncode=code, finished_at=datetime.now(timezone.utc).isoformat())
-        try:
-            self._persist(record)
-        finally:
-            self._close_resource()
+        self._persist(record)
         return record
 
     def cancel(self, *, grace=2):
@@ -236,11 +254,10 @@ class WorkerLease:
             raise OwnershipError('Worker identity is foreign or reused; no signal sent.')
         self._stop_owned(record, grace)
         code = self.process.wait(timeout=5)
+        self._close_resource()
+        self._confirm_resource_released()
         record.update(state='cancelled', returncode=code, finished_at=datetime.now(timezone.utc).isoformat())
-        try:
-            self._persist(record)
-        finally:
-            self._close_resource()
+        self._persist(record)
         return record
 
     def recover(self, *, grace=2):
@@ -252,6 +269,7 @@ class WorkerLease:
         if actual and not actual['terminal'] and (not _same(actual, record['worker']) or not _markers(actual['pid'], record)):
             raise OwnershipError('Worker identity is foreign or reused; no signal sent.')
         self._stop_owned(record, grace)
+        self._confirm_resource_released()
         record.update(state='interrupted', recovered_at=datetime.now(timezone.utc).isoformat())
         self._persist(record)
         return record

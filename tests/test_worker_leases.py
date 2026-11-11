@@ -205,3 +205,21 @@ child.wait()
     finally:
         if manager.process.poll() is None:
             manager.cancel()
+
+
+def test_recovery_cannot_report_completion_while_resource_still_owned(tmp_path):
+    import fcntl
+    import os
+    manager = WorkerLease(tmp_path/'lease.json', tmp_path/'resource.lock')
+    manager.start([sys.executable, '-c', 'pass'])
+    record = manager.wait(timeout=5)
+    record['parent'] = record['worker']
+    (tmp_path/'lease.json').write_text(json.dumps(record))
+    descriptor = os.open(tmp_path/'resource.lock', os.O_RDWR)
+    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        with pytest.raises(OwnershipError, match='resource'):
+            WorkerLease(tmp_path/'lease.json', tmp_path/'resource.lock').recover(grace=0)
+        assert json.loads((tmp_path/'lease.json').read_text())['state'] == 'exited'
+    finally:
+        os.close(descriptor)
