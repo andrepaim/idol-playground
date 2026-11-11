@@ -39,7 +39,7 @@ Fresh isolated synthetic Idol smoke passed on `357262c` with clean tracked files
 
 ### Corpus and evidence gaps
 
-The existing owner dog and generated derivatives may be used for local regression; no redistribution rights are inferred. Public CI must use authored procedural fixtures with documented provenance. The 18 land images, nine swimmer images and annotated held-out split are not yet assembled. Do not fabricate subjects, license grants or quality scores. Asset provenance and visual review remain M0 dependencies.
+The existing owner dog and generated derivatives may be used for local regression; no redistribution rights are inferred. Public CI must use authored procedural fixtures with documented provenance. The complete 18 land images, nine swimmer images and annotated held-out split are not yet assembled. Nine independently authored drawing cases now have a pre-inference frozen development/held-out split; source/license and quality limits are recorded in the [development baseline](character-baseline.md). Do not fabricate subjects, license grants or quality scores. Asset provenance and visual review remain M0 dependencies.
 
 M0 stays open until the provenance-indexed corpus, actual per-stage/resource baseline and quality review exist. M1 controller work can proceed independently using the known private asset and authored fixtures. It must leave broader generated-image quality untested. M3/M4 integration and tier acceptance retain their dependency gates.
 
@@ -58,6 +58,8 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 | M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
 | M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership merged with successful CI; combined executor/recovery merged with successful CI; local input/review API merged with successful CI; browser workflow in validation; model integration pending |
 | M3–M10 | Planned; dependency and acceptance gates remain applicable |
+
+A later isolated development baseline at `c804742` completed the existing Idol → stereo mesh → UniRig path on a licensed canine render. The 855,576-triangle result fails the runtime mesh budget, and its generated 32-bone rig is correctly refused by the current fixed 34-bone walking profile. See [source provenance, timings, memory and visual limitations](character-baseline.md). This demonstrates the remaining preparation/mapping work; it does not establish a playable new image or complete M0.
 
 ## M1 controller foundation
 
