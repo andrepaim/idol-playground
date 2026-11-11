@@ -55,8 +55,9 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 | Milestone | Status |
 |---|---|
 | M0 | Partial audit/decisions; corpus and full baseline pending |
-| M1 | Controller merged with successful combined CI; play scene and portable sample in progress |
-| M2–M10 | Planned; dependency and acceptance gates remain applicable |
+| M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
+| M2 | Schema merged with successful combined CI; atomic metadata store in validation; coordinator/recovery pending |
+| M3–M10 | Planned; dependency and acceptance gates remain applicable |
 
 ## M1 controller foundation
 
@@ -89,3 +90,11 @@ The first M2 increment defines a private character schema, explicit stage states
 Tests first failed on the missing module; additional unsafe encoded-path cases failed before path validation was tightened. The module rejects unknown schema/stages/fields, malformed successful records, unsafe paths, invalid hashes and nonfinite settings. Invalidation preserves the original record and old artifact references while removing successful status and execution fingerprint. Artifact paths use generated ASCII names; owner input filenames are not used as storage paths.
 
 This is pure unexposed logic: no existing API, jobs, worker, GPU ownership or storage behavior changes. It does not establish durable publication, byte-verified cache reuse, restart recovery or resumed inference. Those require the following M2 storage/coordination increments and their own isolated fault/process/API/GPU acceptance. M1's sample and scene have merged; final combined CI is tracked separately before marking that milestone complete.
+
+## M2 atomic metadata store increment
+
+The opt-in store retains content-addressed revisions and atomically publishes a current pointer under a cross-process metadata lock. Compare-and-swap prevents stale writers from overwriting current state. Strict schema/content hash/path checks and streamed artifact verification reject corrupted, truncated, redirected and nonregular outputs. A post-rename directory-sync failure is explicitly uncertain and requires reconciliation, not a silent success or blind retry.
+
+Eight isolated filesystem/process tests and all 95 Python tests pass locally. Previous revisions and orphaned publications are preserved. This increment is not connected to the app and does not implement artifact publication, GPU ownership, recovery or resume; those remain M2 work. See [storage details](character-storage.md).
+
+M1 implementation reached main at `cd2f2e0`, with successful combined CI run `43031731151`. Contracts reached main at `434d7f2`, with successful combined CI run `43032877371`. The local app was refreshed while idle, retains all existing outputs/models, and serves the play page and sample endpoint. Neither result completes the M0 corpus/model-quality baseline or later product tiers.
