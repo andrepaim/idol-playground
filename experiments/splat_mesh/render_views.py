@@ -16,8 +16,10 @@ from experiments.splat_mesh.geometry import cv_extrinsic
 def capture_views(args,on_progress=None):
     args.output.mkdir(parents=True,exist_ok=True)
     started=time.monotonic()
+    versions={name:json.loads((ROOT/'node_modules'/name/'package.json').read_text())['version']
+              for name in ['@mkkellogg/gaussian-splats-3d','three']}
     manifest={'source_sha256':hashlib.sha256(args.splat.read_bytes()).hexdigest(),
-              'renderer':'@mkkellogg/gaussian-splats-3d 0.4.7 / Three 0.170.0',
+              'renderer':f"@mkkellogg/gaussian-splats-3d {versions['@mkkellogg/gaussian-splats-3d']} / Three {versions['three']}",
               'rendering':'Chromium software WebGL; not CUDA inference','pairs':[],'heldout':[]}
     with sync_playwright() as p:
         browser=p.chromium.launch(args=['--no-sandbox','--enable-unsafe-swiftshader'])
