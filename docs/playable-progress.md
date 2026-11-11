@@ -56,7 +56,7 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 |---|---|
 | M0 | Partial audit/decisions; corpus and full baseline pending |
 | M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
-| M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership merged with successful CI; combined executor/recovery merged with successful CI; local input/review API in validation; model integration pending |
+| M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership merged with successful CI; combined executor/recovery merged with successful CI; local input/review API merged with successful CI; browser workflow in validation; model integration pending |
 | M3–M10 | Planned; dependency and acceptance gates remain applicable |
 
 ## M1 controller foundation
@@ -132,3 +132,9 @@ Worker ownership reached main at `bc23fa8` with successful full combined CI `430
 An opt-in private character API now exposes real local CPU image preparation and manual anatomy review through the durable executor. Explicit upload identity supports duplicate reconnect, immutable originals, review/crop correction, status, selected verified artifacts, cancellation and retry. Prepared previews strip metadata; originals remain available even after cancellation. Context-aware validation is bound to the original claimed settings. The feature remains disabled by default, and no inference/reasoning provider or model adapter is registered. See [API behavior and limits](character-api.md).
 
 The combined executor reached main at `75e784c` with successful full combined CI `43071135069`. API/browser model integration and corpus acceptance remain incomplete; this input/manual foundation is not full M2/M3 acceptance.
+
+## M2/M3 browser review and reconnection increment
+
+A separate character page connects the opt-in API to real image/manual-review controls, saved-character selection, crop confirmation, status, cancellation/retry and verified downloads. Validated URL identity reconnects after refresh without submitting work. Delayed reports wait before enabling edits; delayed status cannot regress newer displayed revisions. Local preview URLs are disposed and the page uses local assets/API only. See [workflow behavior and validation limits](character-workflow.md).
+
+The API reached main at `e5b720a` with successful full combined CI `43075985489`. The browser workflow is a preparation/review foundation; model adapters, reasoning evaluation and corpus/quality gates remain unaccepted. 3D/playable stages are explicitly unavailable in this new workflow.

@@ -344,6 +344,7 @@ function applyStatus() {
 async function checkStatus() {
   try {
     cachedStatus = await request('/api/status');
+    $('character-workflow-link').hidden = !cachedStatus.characters?.enabled;
     applyStatus();
   } catch {
     serverReady = false;
