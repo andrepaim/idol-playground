@@ -1,0 +1,25 @@
+# Cooperating worker ownership
+
+`worker_leases.WorkerLease` is an opt-in Linux/WSL subprocess primitive. It is not yet connected to the application, stage coordinator or model launchers. It requires procfs, pidfds and Linux parent-death signaling. Unsupported platforms fail explicitly.
+
+A caller supplies private, application-owned lease and resource-lock paths and trusted argv. User prompts and filenames must never become executable commands. Each attempt needs a new lease path. All cooperating launchers for one physical resource must use the same lock path; advisory locks cannot exclude the existing app or unrelated processes. The manager and directories must be trusted; this is not isolation against hostile code running as the same OS user.
+
+The manager obtains the resource lock and starts a gate-blocked bootstrap with isolated Python startup. It records the parent/worker PID, process start ticks, boot identity hash, UID and random namespace/nonce before granting execution. Metadata publication uses file and directory sync. Failed persistence closes the gate without running the target. The bootstrap sets parent-death signaling and checks its parent before exec. Private logs and the lease use mode 0600; argv is hashed rather than recorded.
+
+The target inherits `IDOL_RESOURCE_FD` and identity markers. A cooperating target must preserve them, retain the resource descriptor until actual completion, and propagate them to resource-using descendants. It must not daemonize, clear the identity, change credentials or execute a set-ID program. Registered adapters must audit these properties and descendant cleanup before integration. Arbitrary vendor subprocess trees are not certified by this primitive.
+
+`wait(timeout=...)` retains ownership on timeout. `cancel(grace=...)` verifies identity and uses pidfds to signal owned workers, waits for termination, reaps its direct child and records cancellation. Verified cooperating descendants are also stopped. Grace is finite and between zero and 30 seconds. A cancellation is a process-lifecycle fact; the coordinator must separately commit its stage transition after termination.
+
+Before reporting exit, cancellation or recovery, the manager also waits for the resource lock to become acquirable. Exiting tasks may lose readable environment markers before inherited descriptors close; process discovery alone is insufficient. A still-held lock leaves completion unverified and the prior record unchanged. Another cooperating owner can conservatively delay this check; its processes are never signaled.
+
+After a launcher crash, `recover()` refuses a still-live original parent and any foreign/reused root identity. It stops verified cooperating survivors and records interruption. Nonchild zombies are terminal; their OS parent is responsible for reaping them. No broad process-group kill is used. Malformed or uncertain records require operator reconciliation; they are never permission to guess a PID or steal an owner. Failed/partial records and logs remain available. No history, cache, owner outputs or model weights are deleted.
+
+Twelve disposable subprocess tests cover exit, private records/logs, exclusion, timeout, cancellation, persistence failure, startup hooks before grant, parent death, foreign/reused identities, invalid grace and descendant termination. GPU acceptance is recorded separately with the tested revision and limitations. These tests do not establish model inference quality, memory ceilings, arbitrary process-tree recovery or compatibility with the existing backend caches.
+
+## RTX 3060 lifecycle receipt
+
+Clean tracked runtime revision `eec17cf86fbfc1c4c7b1af2fa469dc2c10bd8be0`, 2026-11-11 UTC, Linux/WSL, RTX 3060 12,288 MiB, driver 610.88, PyTorch 2.15.0+cu132/CUDA 13.2. A disposable CUDA worker allocated and initialized 268,435,456 bytes and synchronized. PyTorch allocated/reserved both reported that size; this is not total device memory.
+
+All five scenarios passed: second cooperating launcher blocked while live; cancellation and direct-child reaping; subsequent CUDA allocation; parent crash followed by interrupted-lease recovery; subsequent CUDA allocation after crash. The known app was verified idle before stopping and restored ready afterward. Only owned disposable processes were terminated. Initial hardware acceptance exposed the resource-release race described above; its regression failed before the fix and the complete hardware run then passed.
+
+Private receipt: ignored `.local/lease-gpu-receipt.json` in the ownership worktree. No model inference path was changed or tested by this allocation fixture. Model adapters, legacy cache coordination, startup stage reconciliation and browser/API integration remain separate work. Local automation: 138 Python tests, 33 infrastructure tests, Ruff, documentation links and whitespace pass. Author review is not independent approval; PR and combined-commit CI remain required.

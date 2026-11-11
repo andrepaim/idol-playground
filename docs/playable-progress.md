@@ -56,7 +56,7 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 |---|---|
 | M0 | Partial audit/decisions; corpus and full baseline pending |
 | M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
-| M2 | Contracts, atomic store and artifact publication merged with successful CI; coordinator transitions in validation; process/recovery/API pending |
+| M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership in validation; process integration/recovery/API pending |
 | M3–M10 | Planned; dependency and acceptance gates remain applicable |
 
 ## M1 controller foundation
@@ -114,3 +114,9 @@ The coordinator claims stages using verified named dependencies and canonical in
 Eighteen new transition tests and all126 Python/33 infrastructure tests pass locally. `CommitUncertain` propagates for reconciliation instead of being overwritten with a blind failure. No process, GPU or API integration is claimed. See [coordinator details](character-coordinator.md).
 
 Artifact publication reached main at `11d24a0`, with successful combined CI `43046232723`. M0 corpus/model-quality baseline and M2 ownership/recovery/API work remain incomplete.
+
+## M2 cooperating worker ownership increment
+
+An unexposed Linux/WSL worker primitive durably records process identities before granting execution, holds an inherited resource lock, stops verified workers through pidfds and reconciles parent death conservatively. It refuses live-parent takeover and foreign/reused identities. Twelve disposable subprocess tests pass, including a red/green regression for Python startup hooks before grant and private log permissions. See [worker protocol and limits](worker-leases.md).
+
+The coordinator reached main at `3db7849`, with successful combined CI `43049893975`. Existing model launchers, caches and API remain unchanged; model-specific adapters and actual inference/cancellation checks remain required. This ownership increment is not full M2 acceptance.
