@@ -25,3 +25,11 @@ Browser tests first failed on the missing page. Real isolated Uvicorn/PIL servic
 Delayed-response regressions first failed before the fixes: crop details could arrive after controls became editable, and a stale status reply could regress a newer review. Tests now check both consent preservation and monotonic displayed state. Tests use generated synthetic images/private disposable stores; screenshots use a first-party quadruped development probe, not an independent held-out/model-quality case.
 
 This is a 2D UI change. No inference, model loading, process protocol or CUDA path changes. Browser acceptance establishes the tested Chromium behavior, not GPU performance or anatomical quality. The API revision's separate RTX 3060 lifecycle evidence remains scoped to that unchanged backend path. Author review and combined-main CI are required before completion.
+
+## Browser acceptance receipt
+
+Clean tracked UI runtime `8dcba26f09c895c8b46c1d7c184ab34dc507fca6`, 2026-11-11 UTC, Chromium 158.0.8127.18. Eight new real-API browser cases pass; the existing 18 browser cases, 177 Python tests, 33 infrastructure tests and seven JavaScript controller tests also pass. Ruff/ESLint, frontend build, documentation links and whitespace pass.
+
+Desktop 1440×1000 and mobile 375×812 full-page screenshots were inspected using a first-party quadruped drawing development probe (SHA-256 `3e169524001fb84fe8f141db6b0c151b04756c3dc71b92038c3f77c82e7fc14b`). Original/prepared images and controls are readable, with no horizontal overflow or page errors. Screenshot review found a stale saved-selector label; its red/green regression and fix now keep the selected character's status synchronized and use a stable generated short name. Screenshots/receipt stay in ignored `.local/` in the UI worktree; no owner image or generated model is published.
+
+This source is a development UI fixture, not an independent held-out corpus case or anatomical/model-quality result. The local image/manual-review subprocesses were real. No inference or CUDA behavior changed. PR and actual combined-main CI remain required before completion.
