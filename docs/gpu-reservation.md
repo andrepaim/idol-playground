@@ -1,6 +1,6 @@
 # Application GPU reservation
 
-Status: opt-in M2 ownership increment, in validation. It does not register character model adapters or complete global worker/cache integration.
+Status: opt-in M2 ownership increment merged in PR #67 with successful combined-main CI. It does not register character model adapters or complete global worker/cache integration.
 
 On Linux/WSL, set IDOL_GPU_RESERVATION=1 for an application reservation held through startup, idle cached Idol tensors, work and shutdown. The default is disabled, preserving the existing startup behavior and Apple Silicon path. All cooperating instances must use the same resource file. The default is the private cuda.lock under the user's XDG cache idol-playground directory, shared across worktrees. IDOL_GPU_RESOURCE can explicitly select an absolute file for configuration or disposable acceptance tests.
 
@@ -40,4 +40,4 @@ The first hardware harness attempt incorrectly required exit code zero after sen
 
 The owner's app was restored with character input/manual assessment enabled, no active job and no loaded Idol model. Root outputs, model files and private character-store file-size/mtime inventories were unchanged. Existing source inputs, completed outputs and weights were not replaced.
 
-At the tested runtime, 195 Python tests (eighteen new ownership cases), 33 infrastructure tests, seven controller tests and 26 browser tests pass, with lint/build/docs/whitespace checks. Existing browser regression uses disposable/synthetic inputs and software rendering; it does not establish GPU performance or an enabled character model pipeline. Author review is not independent review. PR/current-main integration and actual combined-main CI remain required before completion. Same-app cache/model handoff and vendor descendant audits remain unaccepted.
+At the tested runtime, 195 Python tests (eighteen new ownership cases), 33 infrastructure tests, seven controller tests and 26 browser tests pass, with lint/build/docs/whitespace checks. Existing browser regression uses disposable/synthetic inputs and software rendering; it does not establish GPU performance or an enabled character model pipeline. Author review is not independent review. The increment subsequently merged as `aae5b3925d47a9f5b4ca8a74ca0a861229d7df14`; required PR CI `43099962218` and actual combined-main CI `43101325717` succeeded. Same-app cache/model handoff and vendor descendant audits remain unaccepted.
