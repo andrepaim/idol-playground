@@ -1,6 +1,6 @@
 # Image to playable character: validation and acceptance
 
-Status: proposed acceptance contract, 2026-11-11. Read with the [product/architecture plan](image-to-playable-plan.md) and [milestones](image-to-playable-milestones.md). No measurement below is a claim that the current system passes. Existing [validation policy](validation.md) and [AGENTS.md](../AGENTS.md) continue to apply.
+Status: initial acceptance contract adopted 2026-11-11; current evidence is in [implementation progress](playable-progress.md). Read with the [product/architecture plan](image-to-playable-plan.md) and [milestones](image-to-playable-milestones.md). No measurement below is a claim that the current system passes. Existing [validation policy](validation.md) and [AGENTS.md](../AGENTS.md) continue to apply.
 
 ## 1. Evidence levels and acceptance rules
 

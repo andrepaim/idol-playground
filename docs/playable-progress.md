@@ -55,8 +55,9 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 | Milestone | Status |
 |---|---|
 | M0 | Partial audit/decisions; corpus and full baseline pending |
-| M1 | Controller merged with successful combined CI; play scene and portable sample in progress |
-| M2–M10 | Planned; dependency and acceptance gates remain applicable |
+| M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
+| M2 | Contracts, atomic store, artifact publication and coordinator merged with successful CI; worker ownership merged with successful CI; combined executor/recovery merged with successful CI; local input/review API merged with successful CI; browser workflow in validation; model integration pending |
+| M3–M10 | Planned; dependency and acceptance gates remain applicable |
 
 ## M1 controller foundation
 
@@ -89,3 +90,51 @@ The first M2 increment defines a private character schema, explicit stage states
 Tests first failed on the missing module; additional unsafe encoded-path cases failed before path validation was tightened. The module rejects unknown schema/stages/fields, malformed successful records, unsafe paths, invalid hashes and nonfinite settings. Invalidation preserves the original record and old artifact references while removing successful status and execution fingerprint. Artifact paths use generated ASCII names; owner input filenames are not used as storage paths.
 
 This is pure unexposed logic: no existing API, jobs, worker, GPU ownership or storage behavior changes. It does not establish durable publication, byte-verified cache reuse, restart recovery or resumed inference. Those require the following M2 storage/coordination increments and their own isolated fault/process/API/GPU acceptance. M1's sample and scene have merged; final combined CI is tracked separately before marking that milestone complete.
+
+## M2 atomic metadata store increment
+
+The opt-in store retains content-addressed revisions and atomically publishes a current pointer under a cross-process metadata lock. Compare-and-swap prevents stale writers from overwriting current state. Strict schema/content hash/path checks and streamed artifact verification reject corrupted, truncated, redirected and nonregular outputs. A post-rename directory-sync failure is explicitly uncertain and requires reconciliation, not a silent success or blind retry.
+
+Eight isolated filesystem/process tests and all 95 Python tests pass locally. Previous revisions and orphaned publications are preserved. This increment is not connected to the app and does not implement artifact publication, GPU ownership, recovery or resume; those remain M2 work. See [storage details](character-storage.md).
+
+M1 implementation reached main at `cd2f2e0`, with successful combined CI run `43031720372`. Contracts reached main at `434d7f2`; that revision's CI was cancelled. Full combined CI later passed with the contracts included at `7307cfd` (run `43041650418`). The local app was refreshed while idle, retains all existing outputs/models, and serves the play page and sample endpoint. Neither result completes the M0 corpus/model-quality baseline or later product tiers.
+
+## M2 immutable artifact publication increment
+
+Worker output copies now receive private unique attempt directories, streamed hashes, file/directory sync and atomic directory rename. Originals and previous/partial/orphaned attempts are preserved. Mutable worker outputs cannot alter an already copied snapshot. Publication leaves metadata unchanged; the coordinator must validate that snapshot and commit through revision CAS.
+
+Thirteen new disposable publication tests first failed on the absent method and now pass; all 108 Python tests pass. Failures cover unsafe names/links/FIFO, changing sources, disk/sync errors and uncertain post-rename publication. No app, model, GPU or legacy persistence integration changes. M2 execution ownership/recovery/API integration remains pending.
+
+The metadata store merged at `06a66af` and passed full combined CI `43042898464`. The CI infrastructure repair merged at `7307cfd` and passed combined CI `43041650418`; it uses the official digest-pinned Playwright image matching the locked package, retaining all actual browser acceptance tests.
+
+## M2 coordinator transition increment
+
+The coordinator claims stages using verified named dependencies and canonical input/settings/version fingerprints, returns only byte-verified cache hits, enforces one running stage per character, increments attempts and invalidates affected descendants. It validates immutable snapshots through explicit accept/review/reject decisions, persists hash-bound UTC receipts and commits with revision CAS. Late callbacks cannot replace corrections or retries. Original upload bytes must match the claimed hash.
+
+Eighteen new transition tests and all126 Python/33 infrastructure tests pass locally. `CommitUncertain` propagates for reconciliation instead of being overwritten with a blind failure. No process, GPU or API integration is claimed. See [coordinator details](character-coordinator.md).
+
+Artifact publication reached main at `11d24a0`, with successful combined CI `43046217270`. M0 corpus/model-quality baseline and M2 ownership/recovery/API work remain incomplete.
+
+## M2 cooperating worker ownership increment
+
+An unexposed Linux/WSL worker primitive durably records process identities before granting execution, holds an inherited resource lock, stops verified workers through pidfds and reconciles parent death conservatively. It refuses live-parent takeover and foreign/reused identities. Twelve disposable subprocess tests pass, including a red/green regression for Python startup hooks before grant and private log permissions. See [worker protocol and limits](worker-leases.md).
+
+The coordinator reached main at `3db7849`, with successful combined CI `43049880465`. Existing model launchers, caches and API remain unchanged; model-specific adapters and actual inference/cancellation checks remain required. This ownership increment is not full M2 acceptance.
+
+## M2 combined stage executor increment
+
+The private executor connects stage claims, registered cooperating workers, successful exit/reaping, snapshot validation and CAS. It exclusively owns a character namespace, rejects conflicting services, reconciles restart including the claim-before-lease boundary, preserves timeouts and cache hits, and records cancellation only after termination. Sixteen real subprocess tests pass, including concurrent wait/cancel and uncertain completion. See [execution protocol](character-executor.md). API and actual model adapters remain unconnected; this is not full M2 acceptance.
+
+Worker ownership reached main at `bc23fa8` with successful full combined CI `43055989345`. An evidence audit corrected earlier Dependency Graph run identifiers: publication CI is `43046217270`, coordinator CI is `43049880465`, sample CI is `43031720372`. The cancelled original contract CI is explicitly distinguished from later successful combined validation.
+
+## M2 API and M3 manual foundation increment
+
+An opt-in private character API now exposes real local CPU image preparation and manual anatomy review through the durable executor. Explicit upload identity supports duplicate reconnect, immutable originals, review/crop correction, status, selected verified artifacts, cancellation and retry. Prepared previews strip metadata; originals remain available even after cancellation. Context-aware validation is bound to the original claimed settings. The feature remains disabled by default, and no inference/reasoning provider or model adapter is registered. See [API behavior and limits](character-api.md).
+
+The combined executor reached main at `75e784c` with successful full combined CI `43071135069`. API/browser model integration and corpus acceptance remain incomplete; this input/manual foundation is not full M2/M3 acceptance.
+
+## M2/M3 browser review and reconnection increment
+
+A separate character page connects the opt-in API to real image/manual-review controls, saved-character selection, crop confirmation, status, cancellation/retry and verified downloads. Validated URL identity reconnects after refresh without submitting work. Delayed reports wait before enabling edits; delayed status cannot regress newer displayed revisions. Local preview URLs are disposed and the page uses local assets/API only. See [workflow behavior and validation limits](character-workflow.md).
+
+The API reached main at `e5b720a` with successful full combined CI `43075985489`. The browser workflow is a preparation/review foundation; model adapters, reasoning evaluation and corpus/quality gates remain unaccepted. 3D/playable stages are explicitly unavailable in this new workflow.

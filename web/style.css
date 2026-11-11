@@ -25,3 +25,5 @@
 .play-controls { display: flex; gap: 20px; align-items: center; padding: 12px 0; }
 .play-page header { display: block; padding: 0 0 12px; }
 .play-page h1 { font-size: clamp(2rem, 5vw, 3rem); margin: 12px 0; }
+
+.character-workflow-link{display:inline-block;margin:0 0 24px;padding:10px 15px;border:1px solid #6d8650;border-radius:8px;color:var(--lime);font-size:13px;text-decoration:none}

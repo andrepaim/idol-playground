@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#101512" /><title>Idol · Character preparation</title></head>
+<body>
+<main class="character-page">
+  <header><a class="wordmark" href="/">idol<span>●</span></a><a href="/">Image to 3D ↗</a></header>
+  <section class="intro"><p class="eyebrow">CHARACTER WORKSPACE</p><h1>Start with a character.</h1><p>Prepare a person or animal, then review its anatomy. Your original image stays saved locally.</p></section>
+  <p id="connection-status" role="status" aria-live="polite">Connecting…</p>
+  <p id="character-message" role="alert" hidden></p>
+  <section id="disabled-notice" class="panel" hidden><h2>Character preparation is not enabled.</h2><p>Return to <a href="/">Image to 3D</a>, or enable the local character workflow using the setup instructions.</p></section>
+  <div id="workflow" hidden>
+    <div class="saved-row"><label for="saved-character">Saved characters</label><select id="saved-character"><option value="">New character…</option></select><button id="new-character" type="button">New character</button></div>
+    <div class="workspace-grid">
+      <section class="panel source-panel">
+        <h2><span class="step">01</span> Your image</h2>
+        <form id="character-upload"><fieldset id="upload-fields"><label class="file-picker" for="character-image">Choose one character image<input id="character-image" type="file" accept="image/png,image/jpeg,image/webp" /></label><p class="help">Still PNG, JPEG or WebP · up to 20 MiB. Include the full body and keep limbs visible.</p><button class="primary" id="upload-character" type="submit" disabled>Prepare image →</button></fieldset></form>
+        <div class="image-frame"><img id="source-image" alt="Original character image" hidden /><p id="source-empty">Your original image will appear here.</p></div>
+        <div id="character-downloads" class="downloads"></div>
+      </section>
+      <section class="panel review-panel">
+        <div class="panel-heading"><h2><span class="step">02</span> Review the image</h2><span class="state" id="image-state">Not started</span></div>
+        <div class="image-frame"><img id="prepared-image" alt="Prepared character image" hidden /><p id="prepared-empty">The oriented, cropped preview will appear here.</p></div>
+        <form id="image-review" hidden><fieldset id="image-fields">
+          <details><summary>Adjust the crop</summary><p class="help">Coordinates use the oriented original image.</p><label class="check"><input id="whole-image" type="checkbox" checked /> Use the whole image</label><div class="crop-fields"><label>Left<input id="crop-left" type="number" min="0" step="1" /></label><label>Top<input id="crop-top" type="number" min="0" step="1" /></label><label>Right<input id="crop-right" type="number" min="16" step="1" /></label><label>Bottom<input id="crop-bottom" type="number" min="16" step="1" /></label></div></details>
+          <label class="check"><input id="image-confirmed" type="checkbox" /> I reviewed the image and crop.</label><button class="primary" id="confirm-image" type="submit" disabled>Use this image →</button>
+        </fieldset></form>
+        <div class="action-row"><button id="cancel-stage" type="button" hidden>Stop this step</button><button id="retry-input" type="button" hidden>Retry image preparation</button></div>
+      </section>
+    </div>
+    <section id="anatomy-panel" class="panel anatomy-panel" hidden>
+      <div class="panel-heading"><h2><span class="step">03</span> Review the anatomy</h2><span class="state" id="anatomy-state">Not started</span></div>
+      <p class="help">Choose the body shape you can see. For a person-like animal, use its anatomy rather than its species.</p>
+      <form id="anatomy-form"><fieldset id="anatomy-fields">
+        <div class="anatomy-grid"><label for="body-plan">Body plan<select id="body-plan"><option value="unknown">Choose a body plan…</option><option value="biped">Two-legged / person-like</option><option value="quadruped">Four-legged</option><option value="swimmer">Fish / shark-like swimmer</option><option value="unsupported">Unsupported / other body plan</option></select></label><label for="species">Character type<select id="species"><option value="other">Other</option><option value="person">Person</option><option value="dog">Dog</option><option value="cat">Cat</option><option value="fish">Fish</option><option value="shark">Shark</option></select></label><label for="character-scale">Approximate size (metres)<input id="character-scale" type="number" min="0.01" max="100" step="0.01" value="1" /><span class="help">Desired longest dimension.</span></label></div>
+        <details><summary>3D orientation</summary><label for="front-axis">Forward direction<select id="front-axis"><option value="+z">+Z · default</option><option value="-z">−Z</option><option value="+x">+X</option><option value="-x">−X</option></select></label><p class="help">This can be refined when a 3D model is available.</p></details>
+        <div class="suitability"><label class="check"><input id="single-subject" type="checkbox" /> One main subject</label><label class="check"><input id="full-body" type="checkbox" /> Full body included</label><label class="check"><input id="limbs-separable" type="checkbox" /> Limbs or fins are distinct enough to review</label></div>
+        <label class="check"><input id="anatomy-confirmed" type="checkbox" /> I reviewed these choices against the prepared image.</label><button id="save-anatomy" class="primary" type="submit" disabled>Save anatomy review →</button>
+      </fieldset></form>
+      <p id="anatomy-note" class="help" aria-live="polite"></p>
+    </section>
+    <section id="next-steps" class="next-steps"><h2>Next: build the 3D character.</h2><p>Reconstruction, rigging and motion are not enabled in this workflow yet. A prepared image is not a playable character.</p><a href="/">Open the existing 3D studio ↗</a></section>
+  </div>
+</main>
+<script type="module" src="/characters.js"></script>
+</body></html>
