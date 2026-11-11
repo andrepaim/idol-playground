@@ -183,9 +183,11 @@ class WorkerLease:
         environment['IDOL_RESOURCE_FD'] = str(self._fd)
         try:
             with _private_log(self.path.with_suffix('.stdout.log')) as stdout, _private_log(self.path.with_suffix('.stderr.log')) as stderr:
+                from gpu_reservation import inherited_fds
                 self.process = subprocess.Popen([sys.executable, '-I', '-S', str(Path(__file__).parent/'scripts/worker_gate.py'),
                     '--gate',str(read_gate),'--resource',str(self._fd),'--parent',str(os.getpid()),'--',*command],
-                    stdout=stdout, stderr=stderr, env=environment, start_new_session=True, pass_fds=(read_gate,self._fd))
+                    stdout=stdout, stderr=stderr, env=environment, start_new_session=True,
+                    pass_fds=(read_gate,self._fd,*inherited_fds()))
             identity = _identity(self.process.pid)
             if identity is None:
                 raise OwnershipError('Worker exited before ownership was recorded.')

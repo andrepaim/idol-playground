@@ -56,8 +56,8 @@ M0 stays open until the provenance-indexed corpus, actual per-stage/resource bas
 |---|---|
 | M0 | Partial audit/source review and development baseline; full corpus and quality accounting pending |
 | M1 | T0 known-canine scene and portable sample merged; combined CI passed at cd2f2e0 |
-| M2 | Contracts, atomic store, artifact publication, coordinator, worker ownership, executor/recovery, local input/review API and browser workflow merged with successful combined CI; actual model/global GPU integration pending |
-| M3 | Manual preparation/review foundation merged; isolated bounded proposal contract in validation; provider/routing evaluation pending |
+| M2 | Contracts, atomic store, artifact publication, coordinator, worker ownership, executor/recovery, local input/review API and browser workflow and opt-in application reservation merged with successful combined CI; same-app model/cache handoff and actual model integration pending |
+| M3 | Manual preparation/review foundation merged; isolated bounded proposal contract foundation; provider/routing evaluation pending |
 | M4–M10 | Planned; dependency and acceptance gates remain applicable |
 
 A later isolated development baseline at `c804742` completed the existing Idol → stereo mesh → UniRig path on a licensed canine render. The 855,576-triangle result fails the runtime mesh budget, and its generated 32-bone rig is correctly refused by the current fixed 34-bone walking profile. See [source provenance, timings, memory and visual limitations](character-baseline.md). This demonstrates the remaining preparation/mapping work; it does not establish a playable new image or complete M0.
@@ -143,6 +143,10 @@ A separate character page connects the opt-in API to real image/manual-review co
 The API reached main at `e5b720a` with successful full combined CI `43075985489`. The browser workflow is a preparation/review foundation; model adapters, reasoning evaluation and corpus/quality gates remain unaccepted. 3D/playable stages are explicitly unavailable in this new workflow.
 
 The browser workflow subsequently reached main at `e6ab907` with successful combined CI `43081279947`, including isolated real-API browser acceptance and read-only compatibility checks of the owner's saved canine.
+
+## M2 application reservation increment
+
+An opt-in [application GPU reservation](gpu-reservation.md) excludes cooperating opted-in instances using the same user-cache resource. It covers startup/recovery, idle cache and shutdown, and is inherited by registered direct workers. Cached tensors are released while the reservation is still held. This increment reached main at `aae5b39` with successful combined CI `43101325717`, following actual RTX 3060 acceptance at clean runtime `bd82c69`. The default remains disabled. Same-app model/cache handoff and vendor descendant audits remain separate prerequisites for character model adapters. This is not full M2 acceptance.
 
 ## M3 bounded proposal contract
 

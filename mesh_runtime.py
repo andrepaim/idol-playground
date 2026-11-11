@@ -147,12 +147,13 @@ def run_worker(command, folder, on_event, cancel, *, timeout=1200, env=None, gra
     import subprocess
     import threading
     import time
+    from gpu_reservation import inherited_fds
     messages = queue.Queue()
     started = time.monotonic()
     failure = None
     with (Path(folder) / 'worker.log').open('w') as log:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=log, text=True,
-                                   start_new_session=True, env=env)
+                                   start_new_session=True, env=env, pass_fds=inherited_fds())
 
         def read_output():
             for line in process.stdout:
