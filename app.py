@@ -15,7 +15,9 @@ from typing import Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Query
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
+from playable_package import build_package as build_playable_package
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from model_setup import ensure_models, models_ready
@@ -524,6 +526,23 @@ def get_job(job_id: str):
             if job_id in job_progress:
                 job.update(job_progress[job_id].snapshot())
         return job
+
+
+@app.get('/api/jobs/{job_id}/playable-sample')
+def playable_sample(job_id: str):
+    if len(job_id) != 32 or any(c not in '0123456789abcdef' for c in job_id):
+        raise HTTPException(404, 'Walking result not found.')
+    job = get_job(job_id)
+    try:
+        data = build_playable_package(OUTPUTS / job_id, job, ROOT)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    except OSError:
+        raise HTTPException(503, 'Sample source files are unavailable. Restore the local source installation and retry.') from None
+    return Response(data, media_type='application/zip', headers={
+        'Content-Disposition': 'attachment; filename="idol-canine-sample.zip"',
+        'Cache-Control': 'no-store',
+    })
 
 
 @app.post('/api/jobs/{job_id}/cancel', status_code=202)
