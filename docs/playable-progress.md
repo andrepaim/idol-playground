@@ -81,3 +81,11 @@ Clean private export acceptance: 13,321,556-byte ZIP extracted into an isolated 
 A sustained moving scene benchmark at `16960cb` passed with clean tracked files: 3,600 frames over 60 seconds, median 16.7 ms, p95 16.8 ms, viewport 1920×1080, canvas 1052×650, DPR 1, RTX 3060 D3D12, Chromium 158.0.8127.18. It does not establish full-screen 1080p performance or improved anatomy. The known canine remains an experimental generated asset with visible deformation limitations. T0 proves gameplay, not natural-motion quality or image-to-play acceptance.
 
 M1 packaging integration and combined-commit CI are still required before completion. M0 corpus/quality baseline and M2–M10 remain open. Independent M2 schema/storage work can use the frozen M0 decisions while corpus-dependent model acceptance stays blocked.
+
+## M2 contract foundation
+
+The first M2 increment defines a private character schema, explicit stage states, safe relative artifact references, canonical input/parameter/tool-version fingerprints and immutable downstream invalidation. It separates predicted skeleton, semantic mapping and skinning: mapping-only changes invalidate motion/package while preserving skin and reconstruction; skeleton changes invalidate both mapping and skin. Changed body assessment preserves the splat/mesh and invalidates downstream mesh assessment/preparation.
+
+Tests first failed on the missing module; additional unsafe encoded-path cases failed before path validation was tightened. The module rejects unknown schema/stages/fields, malformed successful records, unsafe paths, invalid hashes and nonfinite settings. Invalidation preserves the original record and old artifact references while removing successful status and execution fingerprint. Artifact paths use generated ASCII names; owner input filenames are not used as storage paths.
+
+This is pure unexposed logic: no existing API, jobs, worker, GPU ownership or storage behavior changes. It does not establish durable publication, byte-verified cache reuse, restart recovery or resumed inference. Those require the following M2 storage/coordination increments and their own isolated fault/process/API/GPU acceptance. M1's sample and scene have merged; final combined CI is tracked separately before marking that milestone complete.
