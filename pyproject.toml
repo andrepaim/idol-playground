@@ -23,7 +23,7 @@ conflicts = [[{extra = "cpu"}, {extra = "local"}]]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["tests/test_mesh_diagnostics.py", "tests/test_gpu_reservation.py", "tests/test_anatomy_reasoning.py", "tests/test_character_api.py", "tests/test_worker_leases.py", "tests/test_character_executor.py", "tests/test_character_coordinator.py", "tests/test_character_publication.py", "tests/test_character_store.py", "tests/test_character_contracts.py", "tests/test_playable_package.py", "tests/test_app.py", "tests/test_progress.py", "tests/test_mesh.py", "tests/test_rig.py", "tests/test_walk.py", "tests/test_splat_mesh.py", "tests/test_splat_integration.py", "experiments/walking/test_pose.py"]
+testpaths = ["tests/test_mesh_diagnostics.py", "tests/test_gpu_reservation.py", "tests/test_anatomy_reasoning.py", "tests/test_character_api.py", "tests/test_worker_leases.py", "tests/test_character_executor.py", "tests/test_character_coordinator.py", "tests/test_character_publication.py", "tests/test_character_store.py", "tests/test_character_contracts.py", "tests/test_playable_package.py", "tests/test_app.py", "tests/test_progress.py", "tests/test_mesh.py", "tests/test_rig.py", "tests/test_walk.py", "tests/test_splat_mesh.py", "tests/test_splat_integration.py", "experiments/walking/test_pose.py", "experiments/vertical_slice/test_quadruped_fit.py"]
 
 [tool.uv.sources]
 torch = [{index = "pytorch-cpu", extra = "cpu"}]

@@ -151,3 +151,7 @@ An opt-in [application GPU reservation](gpu-reservation.md) excludes cooperating
 ## M3 bounded proposal contract
 
 An isolated [reasoning contract](anatomy-reasoning.md) adds metadata-stripped image views, closed typed proposals, supplied-view evidence checks, explicit manual fallback and call/byte/deadline limits. Every proposal requires review. Timeout/caller cancellation retains an active-call guard until completion; bounded close reports unfinished cancellation. No provider, external request, API/UI integration or automatic anatomical acceptance is enabled. Fake-provider and image/parser tests validate the boundary; actual routing accuracy and provider cost remain untested.
+
+## Feasibility spike: template rig and reconstruction comparison
+
+At the owner's request, M2 Idol integration (#68) is paused for a [vertical slice](vertical-slice.md) (#72). The licensed Shiba development subject was made playable in the unchanged M1 runtime from two meshes: the existing Idol → stereo baseline and a TRELLIS-image-large reconstruction. Each was simplified to 48,000 triangles, fitted with a 24-joint quadruped template rig, heat-skinned and given a planted-paw IK walk. Both pass the numeric contact, penetration and seam gates on this one subject. TRELLIS produced a cleaner watertight mesh in about 30 s of RTX 3060 inference, after low-memory changes. This is go/no-go evidence for re-planning M4/M5, not tier acceptance or the owner's visual review.
