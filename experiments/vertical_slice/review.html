@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vertical slice review</title>
+<style>body{margin:0;background:#f2f2ee}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head>
+<body>
+<script type="module">
+// Fixed-camera review frames of an in-place clip: the same views and phases for every candidate.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const params = new URLSearchParams(location.search);
+const width = 480, height = 360;
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(1);
+renderer.setSize(width, height);
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf2f2ee);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x777777, 2));
+const sun = new THREE.DirectionalLight(0xffffff, 2);
+sun.position.set(2, 4, 3);
+scene.add(sun);
+scene.add(new THREE.GridHelper(4, 40, 0x999999, 0xcccccc));
+const camera = new THREE.PerspectiveCamera(35, width / height, 0.01, 100);
+
+const gltf = await new GLTFLoader().loadAsync(params.get('model'));
+const root = gltf.scene;
+scene.add(root);
+root.traverse(node => { if (node.isSkinnedMesh) node.frustumCulled = false; });
+const clip = gltf.animations.find(item => item.name === (params.get('clip') || 'Walk_inplace'));
+const mixer = new THREE.AnimationMixer(root);
+mixer.clipAction(clip).play();
+mixer.setTime(0);
+root.updateMatrixWorld(true);
+const box = new THREE.Box3().setFromObject(root);
+const center = box.getCenter(new THREE.Vector3());
+const radius = box.getSize(new THREE.Vector3()).length() / 2;
+const skeleton = new THREE.SkeletonHelper(root);
+skeleton.material.depthTest = false;
+skeleton.visible = false;
+scene.add(skeleton);
+// The runtime treats glTF +X as the character's forward direction.
+const views = {front: [1, 0, 0], left: [0, 0, -1], rear: [-1, 0, 0], right: [0, 0, 1], three_quarter: [0.7, 0, -0.7]};
+
+window.review = {
+  views: Object.keys(views),
+  duration: clip.duration,
+  show(view, phase, withSkeleton = false, elevation = 0.3) {
+    mixer.setTime(phase * clip.duration);
+    skeleton.visible = withSkeleton;
+    const direction = new THREE.Vector3(...views[view]);
+    direction.y = elevation;
+    direction.normalize();
+    camera.position.copy(center).addScaledVector(direction, radius * 3.4);
+    camera.lookAt(center);
+    renderer.render(scene, camera);
+    return true;
+  },
+};
+document.body.dataset.ready = '1';
+</script>
+</body>
+</html>
